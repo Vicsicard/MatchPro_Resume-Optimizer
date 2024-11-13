@@ -1,0 +1,5 @@
+/* Remove any existing styles and keep only what you need */
+.app {
+  width: 100%;
+  min-height: 100vh;
+}
