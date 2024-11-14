@@ -211,14 +211,16 @@ router.post('/create-checkout-session', async (req, res) => {
   try {
     console.log('Creating checkout session...');
     console.log('Request body:', req.body);
+    console.log('Environment variables:', {
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ? 'Set' : 'Not set',
+      VITE_STRIPE_PRICE_ID: process.env.VITE_STRIPE_PRICE_ID
+    });
     
-    const { priceId, successUrl, cancelUrl } = req.body;
+    const { successUrl, cancelUrl } = req.body;
     
-    // Validate price ID
-    if (!priceId) {
-      console.error('No price ID provided');
-      return res.status(400).json({ error: 'Price ID is required' });
-    }
+    // Hardcode the test price ID
+    const priceId = 'price_1QL9lbGEHfPiJwM4RHobn8DD';
+    console.log('Using hardcoded test price ID:', priceId);
 
     // Use provided URLs or fallback to environment variables
     const baseUrl = process.env.VITE_BASEURL || 'http://localhost:5173';
@@ -251,12 +253,23 @@ router.post('/create-checkout-session', async (req, res) => {
       submit_type: 'pay',
     });
 
-    console.log('Checkout session created:', session);
+    console.log('Checkout session created successfully:', {
+      sessionId: session.id,
+      url: session.url
+    });
 
     res.json({ url: session.url });
   } catch (error) {
-    console.error('Error creating checkout session:', error);
-    res.status(500).json({ error: 'Failed to create checkout session', details: error.message });
+    console.error('Error creating checkout session:', {
+      message: error.message,
+      type: error.type,
+      stack: error.stack
+    });
+    res.status(500).json({ 
+      error: 'Failed to create checkout session',
+      details: error.message,
+      type: error.type
+    });
   }
 });
 

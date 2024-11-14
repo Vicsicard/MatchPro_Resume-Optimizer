@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 
 // Configure dotenv to read .env file from project root
 console.log('Loading environment variables...');
-const envPath = path.resolve(__dirname, '../../.env');
+const envPath = path.resolve(__dirname, '../.env.local');
 console.log('Environment file path:', envPath);
 dotenv.config({ path: envPath });
 

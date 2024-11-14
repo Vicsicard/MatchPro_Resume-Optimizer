@@ -11,13 +11,13 @@ const PremiumCheckout = () => {
       setError('');
       
       console.log('Starting checkout process...');
+      
       const response = await fetch('http://localhost:3000/api/create-checkout-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          priceId: import.meta.env.VITE_STRIPE_PRICE_ID,
           successUrl: `${window.location.origin}/upload`,
           cancelUrl: `${window.location.origin}/pricing`
         })
