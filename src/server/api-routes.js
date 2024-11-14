@@ -8,6 +8,7 @@ import {
   extractTextFromPDF
 } from './file-processing.js';
 import { stripe } from './server.js';
+import { addOptimizationCredits, hasRemainingOptimizations, useOptimization } from './optimization-tracking.js';
 
 const router = Router();
 
@@ -276,11 +277,16 @@ router.post('/create-checkout-session', async (req, res) => {
 // Verify session endpoint
 router.post('/verify-session', async (req, res) => {
   try {
-    const { sessionId } = req.body;
+    const { sessionId, userId } = req.body;
     
     if (!sessionId) {
       console.log('No session ID provided');
       return res.status(400).json({ error: 'Session ID is required' });
+    }
+
+    if (!userId) {
+      console.log('No user ID provided');
+      return res.status(400).json({ error: 'User ID is required' });
     }
 
     console.log('Retrieving session:', sessionId);
@@ -289,11 +295,22 @@ router.post('/verify-session', async (req, res) => {
     
     if (session.payment_status === 'paid') {
       console.log('Payment verified successfully');
+
+      // Add 10 optimization credits to the user's account
+      try {
+        await addOptimizationCredits(userId);
+        console.log('Added 10 optimization credits to user:', userId);
+      } catch (error) {
+        console.error('Error adding optimization credits:', error);
+        // Continue with the response even if credits failed to add
+      }
+
       res.json({ 
         verified: true,
         customerId: session.customer,
         paymentIntent: session.payment_intent,
-        amount: session.amount_total
+        amount: session.amount_total,
+        credits: 10
       });
     } else {
       console.log('Payment not verified:', session.payment_status);
@@ -317,6 +334,70 @@ router.post('/verify-session', async (req, res) => {
     res.status(statusCode).json({ 
       error: errorMessage,
       type: error.type,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Check remaining optimizations endpoint
+router.get('/remaining-optimizations/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const hasCredits = await hasRemainingOptimizations(userId);
+    res.json({ hasCredits });
+  } catch (error) {
+    console.error('Error checking optimizations:', error);
+    res.status(500).json({ 
+      error: 'Failed to check remaining optimizations',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Test endpoints for optimization tracking
+router.post('/test-optimization/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { action } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    let result;
+    switch (action) {
+      case 'add':
+        // Add 5 test credits
+        result = await addOptimizationCredits(userId, 5);
+        return res.json({ message: 'Added 5 credits', result });
+      
+      case 'check':
+        // Check remaining credits
+        result = await hasRemainingOptimizations(userId);
+        return res.json({ hasCredits: result });
+      
+      case 'use':
+        // Use one credit
+        result = await useOptimization(userId);
+        return res.json({ message: 'Used 1 credit', remaining: result.remaining });
+      
+      case 'stats':
+        // Get stats
+        result = await getOptimizationStats(userId);
+        return res.json(result);
+      
+      default:
+        return res.status(400).json({ error: 'Invalid action' });
+    }
+  } catch (error) {
+    console.error('Test endpoint error:', error);
+    res.status(500).json({ 
+      error: 'Test failed',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

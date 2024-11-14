@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Optimization Credits Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .button.purchase {
+            background: #28a745;
+        }
+        .credits {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            margin: 20px 0;
+        }
+        .price {
+            font-size: 18px;
+            color: #28a745;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Optimization Credits Test</h1>
+        <div id="auth-status" class="status">Checking authentication...</div>
+        
+        <div class="credits">
+            Credits Remaining: <span id="credits-remaining">Loading...</span>
+        </div>
+        
+        <div class="price">
+            Purchase 10 more credits for $19.99
+        </div>
+
+        <div>
+            <button class="button" onclick="checkCredits()">Check Credits</button>
+            <button class="button" onclick="useCredit()">Use 1 Credit</button>
+            <button class="button purchase" onclick="purchaseCredits()">Purchase Credits</button>
+        </div>
+
+        <div id="status" class="status"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+        
+        let supabase;
+        let userId;
+
+        async function initializeSupabase() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                
+                supabase = createClient(config.VITE_SUPABASE_URL, config.VITE_SUPABASE_ANON_KEY);
+                
+                // Check authentication
+                const { data: { user }, error: authError } = await supabase.auth.getUser();
+                if (user) {
+                    userId = user.id;
+                    document.getElementById('auth-status').className = 'status success';
+                    document.getElementById('auth-status').textContent = `Logged in as: ${user.email}`;
+                    await checkCredits();
+                } else {
+                    document.getElementById('auth-status').className = 'status error';
+                    document.getElementById('auth-status').textContent = 'Please log in first';
+                }
+            } catch (error) {
+                document.getElementById('auth-status').className = 'status error';
+                document.getElementById('auth-status').textContent = 'Error initializing: ' + error.message;
+            }
+        }
+
+        window.checkCredits = async function() {
+            try {
+                const { data, error } = await supabase
+                    .from('user_credits')
+                    .select('credits_remaining, total_optimizations')
+                    .eq('user_id', userId)
+                    .single();
+                
+                if (error) throw error;
+                
+                document.getElementById('credits-remaining').textContent = data.credits_remaining;
+                document.getElementById('status').className = 'status success';
+                document.getElementById('status').textContent = `You have used ${data.total_optimizations} optimizations so far`;
+            } catch (error) {
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').textContent = 'Error checking credits: ' + error.message;
+            }
+        }
+
+        window.useCredit = async function() {
+            try {
+                // First check if user has credits
+                const { data: creditData, error: creditError } = await supabase
+                    .from('user_credits')
+                    .select('credits_remaining')
+                    .eq('user_id', userId)
+                    .single();
+                
+                if (creditError) throw creditError;
+                
+                if (creditData.credits_remaining <= 0) {
+                    document.getElementById('status').className = 'status warning';
+                    document.getElementById('status').textContent = 'No credits remaining. Please purchase more credits.';
+                    return;
+                }
+
+                // Update credits
+                const { data, error } = await supabase
+                    .from('user_credits')
+                    .update({ 
+                        credits_remaining: creditData.credits_remaining - 1,
+                        total_optimizations: supabase.sql`total_optimizations + 1`
+                    })
+                    .eq('user_id', userId);
+                
+                if (error) throw error;
+                
+                await checkCredits();
+                
+                document.getElementById('status').className = 'status success';
+                document.getElementById('status').textContent = 'Successfully used 1 credit';
+            } catch (error) {
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').textContent = 'Error using credit: ' + error.message;
+            }
+        }
+
+        window.purchaseCredits = async function() {
+            // Redirect to your payment page or open Stripe checkout
+            document.getElementById('status').className = 'status';
+            document.getElementById('status').textContent = 'Payment integration coming soon...';
+        }
+
+        // Initialize when the page loads
+        initializeSupabase();
+    </script>
+</body>
+</html>

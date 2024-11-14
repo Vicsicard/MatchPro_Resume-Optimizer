@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Email Confirmation - MatchPro</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            text-align: center;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .success {
+            color: #28a745;
+            font-size: 24px;
+            margin: 20px 0;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+        }
+        #status {
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Email Confirmation</h1>
+        <div id="status">Processing your confirmation...</div>
+        <div id="next-steps" style="display: none;">
+            <p class="success">✓ Email confirmed successfully!</p>
+            <p>Your account has been verified.</p>
+            <a href="/auth-test.html" class="button">Continue to Login</a>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+
+        async function getConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                return {
+                    supabaseUrl: config.VITE_SUPABASE_URL,
+                    supabaseKey: config.VITE_SUPABASE_ANON_KEY
+                };
+            } catch (error) {
+                console.error('Error fetching config:', error);
+                document.getElementById('status').innerHTML = 'Error loading configuration. Please try again.';
+                return null;
+            }
+        }
+
+        async function handleConfirmation() {
+            try {
+                const config = await getConfig();
+                if (!config) return;
+
+                const supabase = createClient(config.supabaseUrl, config.supabaseKey);
+                
+                // Get the hash from the URL
+                const hash = window.location.hash.substring(1);
+                const params = new URLSearchParams(hash);
+                
+                // Get the tokens from the URL
+                const accessToken = params.get('access_token');
+                const refreshToken = params.get('refresh_token');
+                const type = params.get('type');
+
+                if (type === 'recovery') {
+                    document.getElementById('status').innerHTML = 'Please reset your password:';
+                    // Add password reset form here if needed
+                    return;
+                }
+
+                if (accessToken) {
+                    const { error } = await supabase.auth.setSession({
+                        access_token: accessToken,
+                        refresh_token: refreshToken,
+                    });
+
+                    if (error) {
+                        throw error;
+                    }
+
+                    // Show success message and next steps
+                    document.getElementById('status').style.display = 'none';
+                    document.getElementById('next-steps').style.display = 'block';
+                } else {
+                    document.getElementById('status').innerHTML = 'No confirmation token found. Please check your confirmation link.';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('status').innerHTML = `Error: ${error.message}`;
+            }
+        }
+
+        // Run the confirmation handler when the page loads
+        handleConfirmation();
+    </script>
+</body>
+</html>

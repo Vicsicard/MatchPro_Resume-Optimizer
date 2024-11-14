@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MatchPro Resume Auth Test</title>
+    <style>
+        :root {
+            --background: #ffffff;
+            --foreground: hsl(222.2, 84%, 4.9%);
+            --card: #ffffff;
+            --card-foreground: hsl(222.2, 84%, 4.9%);
+            --primary: hsl(222.2, 47.4%, 11.2%);
+            --primary-foreground: hsl(210, 40%, 98%);
+            --secondary: hsl(210, 40%, 96.1%);
+            --secondary-foreground: hsl(222.2, 47.4%, 11.2%);
+            --muted: hsl(210, 40%, 96.1%);
+            --muted-foreground: hsl(215.4, 16.3%, 46.9%);
+            --accent: hsl(210, 40%, 96.1%);
+            --accent-foreground: hsl(222.2, 47.4%, 11.2%);
+            --destructive: hsl(0, 84.2%, 60.2%);
+            --border: hsl(214.3, 31.8%, 91.4%);
+            --input: hsl(214.3, 31.8%, 91.4%);
+            --ring: hsl(222.2, 84%, 4.9%);
+            --radius: 0.5rem;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--background);
+            color: var(--foreground);
+            line-height: 1.5;
+            margin: 0;
+            padding: 2rem;
+        }
+
+        .card {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 1.875rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+            font-weight: 500;
+            height: 2.5rem;
+            padding: 0 1rem;
+            background-color: var(--primary);
+            color: var(--primary-foreground);
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: hsl(222.2, 47.4%, 20%);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        input {
+            width: 100%;
+            height: 2.5rem;
+            padding: 0 0.75rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--input);
+            background-color: var(--background);
+            color: var(--foreground);
+            margin-bottom: 1rem;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--ring);
+            box-shadow: 0 0 0 2px var(--ring);
+        }
+
+        .status {
+            background: var(--muted);
+            padding: 0.75rem;
+            border-radius: var(--radius);
+            margin-top: 1rem;
+            color: var(--muted-foreground);
+        }
+
+        .user-info-card {
+            background: var(--card);
+            padding: 1.5rem;
+            border-radius: var(--radius);
+            margin-top: 1.5rem;
+            border: 1px solid var(--border);
+        }
+
+        .user-info-card h3 {
+            margin: 0 0 1.25rem 0;
+            color: var(--primary);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.75rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .info-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .info-row {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            background: var(--secondary);
+            border-radius: var(--radius);
+            margin: 0;
+        }
+
+        .info-label {
+            font-weight: 500;
+            width: 140px;
+            color: var(--secondary-foreground);
+            margin-right: 1rem;
+        }
+
+        .info-value {
+            color: var(--foreground);
+            flex: 1;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .button-group button {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>MatchPro Resume Auth Test</h1>
+        <div id="config-status" class="status"></div>
+        <div id="session-status" class="status"></div>
+
+        <div id="auth-forms">
+            <div id="signup-form">
+                <h2>Sign Up</h2>
+                <input type="email" id="signup-email" placeholder="Email">
+                <input type="password" id="signup-password" placeholder="Password">
+                <button class="button" onclick="signUp()">Sign Up</button>
+            </div>
+
+            <div id="login-form">
+                <h2>Login</h2>
+                <input type="email" id="login-email" placeholder="Email">
+                <input type="password" id="login-password" placeholder="Password">
+                <button class="button" onclick="login()">Login</button>
+            </div>
+        </div>
+
+        <div>
+            <h2>User Actions</h2>
+            <button class="button" onclick="getCurrentUser()">Get Current User</button>
+            <button class="button" onclick="signOut()">Sign Out</button>
+        </div>
+
+        <div id="user-info"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+        
+        let supabase;
+
+        async function initializeSupabase() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                
+                supabase = createClient(config.VITE_SUPABASE_URL, config.VITE_SUPABASE_ANON_KEY);
+                
+                document.getElementById('config-status').className = 'status success';
+                document.getElementById('config-status').textContent = 'Configuration loaded successfully';
+                
+                // Check for existing session
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                if (session) {
+                    document.getElementById('session-status').className = 'status success';
+                    document.getElementById('session-status').textContent = 'Currently logged in as: ' + session.user.email;
+                    showUserInfo(session.user);
+                } else {
+                    document.getElementById('session-status').className = 'status';
+                    document.getElementById('session-status').textContent = 'Not logged in';
+                }
+            } catch (error) {
+                document.getElementById('config-status').className = 'status error';
+                document.getElementById('config-status').textContent = 'Error loading configuration: ' + error.message;
+            }
+        }
+
+        window.signUp = async function() {
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            
+            try {
+                const { data, error } = await supabase.auth.signUp({
+                    email,
+                    password,
+                });
+                
+                if (error) throw error;
+                
+                document.getElementById('session-status').className = 'status success';
+                document.getElementById('session-status').textContent = 'Signup successful! Please check your email to confirm your account.';
+                if (data.user) {
+                    showUserInfo(data.user);
+                }
+            } catch (error) {
+                document.getElementById('session-status').className = 'status error';
+                document.getElementById('session-status').textContent = 'Error signing up: ' + error.message;
+            }
+        }
+
+        window.login = async function() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password,
+                });
+                
+                if (error) throw error;
+                
+                document.getElementById('session-status').className = 'status success';
+                document.getElementById('session-status').textContent = 'Login successful!';
+                if (data.user) {
+                    showUserInfo(data.user);
+                }
+            } catch (error) {
+                document.getElementById('session-status').className = 'status error';
+                document.getElementById('session-status').textContent = 'Error logging in: ' + error.message;
+            }
+        }
+
+        window.getCurrentUser = async function() {
+            try {
+                const { data: { user }, error } = await supabase.auth.getUser();
+                
+                if (error) throw error;
+                
+                if (user) {
+                    showUserInfo(user);
+                } else {
+                    document.getElementById('user-info').textContent = 'No user currently logged in';
+                }
+            } catch (error) {
+                document.getElementById('user-info').textContent = 'Error getting user: ' + error.message;
+            }
+        }
+
+        window.signOut = async function() {
+            try {
+                const { error } = await supabase.auth.signOut();
+                
+                if (error) throw error;
+                
+                document.getElementById('session-status').className = 'status';
+                document.getElementById('session-status').textContent = 'Signed out successfully';
+                document.getElementById('user-info').textContent = '';
+            } catch (error) {
+                document.getElementById('session-status').className = 'status error';
+                document.getElementById('session-status').textContent = 'Error signing out: ' + error.message;
+            }
+        }
+
+        function showUserInfo(user) {
+            const userInfo = {
+                'Email': user.email,
+                'Email Confirmed': user.email_confirmed_at ? 'Yes' : 'No',
+                'Account Created': new Date(user.created_at).toLocaleDateString(),
+                'Last Sign In': new Date(user.last_sign_in_at).toLocaleDateString()
+            };
+
+            const infoHtml = Object.entries(userInfo)
+                .map(([key, value]) => 
+                    `<div class="info-row">
+                        <div class="info-label">${key}:</div>
+                        <div class="info-value">${value}</div>
+                    </div>`
+                ).join('');
+
+            document.getElementById('user-info').innerHTML = `
+                <div class="user-info-card">
+                    <h3>User Information</h3>
+                    <div class="info-container">
+                        ${infoHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Initialize when the page loads
+        initializeSupabase();
+    </script>
+</body>
+</html>
