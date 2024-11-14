@@ -6,6 +6,7 @@ export default function SuccessPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState('loading');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const verifyPayment = async () => {
@@ -13,13 +14,14 @@ export default function SuccessPage() {
         const sessionId = searchParams.get('session_id');
         if (!sessionId) {
           setStatus('error');
+          setError('No session ID found');
           return;
         }
 
         // Log the session ID for debugging
         console.log('Session ID:', sessionId);
 
-        const response = await fetch('http://localhost:5000/api/verify-session', {
+        const response = await fetch('http://localhost:3000/api/verify-session', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -27,20 +29,34 @@ export default function SuccessPage() {
           body: JSON.stringify({ sessionId }),
         });
 
+        const data = await response.json();
+
         if (response.ok) {
           setStatus('success');
         } else {
           setStatus('error');
-          console.error('Verification failed:', await response.json());
+          setError(data.message || 'Payment verification failed');
+          console.error('Verification failed:', data);
         }
       } catch (error) {
         console.error('Error during verification:', error);
         setStatus('error');
+        setError('Network error - please try again');
       }
     };
 
     verifyPayment();
   }, [searchParams]);
+
+  const handleRetry = () => {
+    setStatus('loading');
+    setError('');
+    window.location.reload();
+  };
+
+  const handleGoHome = () => {
+    navigate('/');
+  };
 
   if (status === 'loading') {
     return (
@@ -58,28 +74,19 @@ export default function SuccessPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
-            <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+          <div className="text-red-600 mb-4">
+            <svg className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900">Payment Verification Failed</h2>
-          <p className="mt-2 text-gray-600">
-            We couldn't verify your payment. Please contact support if you believe this is an error.
-          </p>
+          <h2 className="text-xl font-semibold text-gray-900">Payment Verification Failed</h2>
+          <p className="mt-2 text-gray-600">{error || 'Something went wrong. Please try again.'}</p>
           <div className="mt-6 space-y-2">
-            <Button
-              onClick={() => navigate('/pricing')}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              Return to Pricing
+            <Button onClick={handleRetry} className="w-full">
+              Retry Verification
             </Button>
-            <Button
-              onClick={() => navigate('/contact')}
-              variant="outline"
-              className="w-full border-gray-300"
-            >
-              Contact Support
+            <Button onClick={handleGoHome} variant="outline" className="w-full">
+              Return Home
             </Button>
           </div>
         </div>
@@ -90,21 +97,18 @@ export default function SuccessPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
-        <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
-          <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+        <div className="text-green-600 mb-4">
+          <svg className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 className="text-2xl font-bold text-gray-900">Payment Successful!</h2>
+        <h2 className="text-xl font-semibold text-gray-900">Payment Successful!</h2>
         <p className="mt-2 text-gray-600">
-          Thank you for subscribing to MatchPro Resume. Let's get started on optimizing your resume!
+          Thank you for your purchase. You now have access to all premium features.
         </p>
         <div className="mt-6">
-          <Button
-            onClick={() => navigate('/upload')}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            Start Optimizing Your Resume
+          <Button onClick={handleGoHome} className="w-full">
+            Continue to Dashboard
           </Button>
         </div>
       </div>

@@ -17,8 +17,8 @@ const PricingPage = () => {
       {/* Hero Section */}
       <div className="bg-blue-600 py-20">
         <div className="container mx-auto text-center text-white">
-          <h1 className="text-4xl font-bold mb-4">Choose Your Plan</h1>
-          <p className="text-xl opacity-90">Get started with our flexible pricing options</p>
+          <h1 className="text-4xl font-bold mb-4">Simple, Transparent Pricing</h1>
+          <p className="text-xl opacity-90">Choose the plan that's right for you</p>
         </div>
       </div>
 
@@ -29,60 +29,62 @@ const PricingPage = () => {
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle className="text-2xl">Free Trial</CardTitle>
-              <p className="text-gray-500">Perfect for getting started</p>
+              <p className="text-2xl font-bold">$0</p>
             </CardHeader>
             <CardContent>
-              <div className="mb-8">
-                <p className="text-3xl font-bold mb-6">$0</p>
-                <ul className="space-y-3">
+              <div className="space-y-4">
+                <ul className="space-y-2">
                   <li className="flex items-center gap-2">
                     <Check className="text-green-500" size={20} />
-                    <span>One free resume optimization</span>
+                    <span>1 resume optimization</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="text-green-500" size={20} />
-                    <span>Basic ATS optimization</span>
+                    <span>Basic ATS analysis</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="text-green-500" size={20} />
-                    <span>Standard formatting template</span>
+                    <span>Standard formatting</span>
                   </li>
                 </ul>
+                <Button 
+                  onClick={handleFreeTrial}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                >
+                  Start Free Trial
+                </Button>
               </div>
-              <Button 
-                onClick={handleFreeTrial}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold"
-              >
-                Start Free Trial
-              </Button>
             </CardContent>
           </Card>
 
           {/* Premium Card */}
           <Card className="shadow-lg border-blue-200">
             <CardHeader>
-              <CardTitle className="text-2xl">Premium Package</CardTitle>
-              <p className="text-gray-500">For serious job seekers</p>
+              <CardTitle className="text-2xl">Premium</CardTitle>
+              <p className="text-2xl font-bold">$19.99</p>
             </CardHeader>
             <CardContent>
-              <div className="mb-8">
-                <p className="text-3xl font-bold mb-6">$19.99</p>
-                <ul className="space-y-3">
+              <div className="space-y-4">
+                <ul className="space-y-2">
                   <li className="flex items-center gap-2">
                     <Check className="text-green-500" size={20} />
-                    <span>Advanced ATS keyword matching</span>
+                    <span>10 resume optimizations</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="text-green-500" size={20} />
+                    <span>Advanced ATS optimization</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="text-green-500" size={20} />
+                    <span>AI-powered suggestions</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="text-green-500" size={20} />
                     <span>Premium formatting templates</span>
                   </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="text-green-500" size={20} />
-                    <span>10 resume optimizations</span>
-                  </li>
                 </ul>
+                <PremiumCheckout />
               </div>
-              <PremiumCheckout />
             </CardContent>
           </Card>
         </div>

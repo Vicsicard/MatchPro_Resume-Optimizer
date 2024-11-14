@@ -1,7 +1,8 @@
-import Tesseract from 'tesseract.js';
-import mammoth from 'mammoth';
-import sharp from 'sharp';
-import fs from 'fs';
+const Tesseract = require('tesseract.js');
+const mammoth = require('mammoth');
+const sharp = require('sharp');
+const fs = require('fs');
+const pdf = require('pdf-parse');
 
 // Image preprocessing for OCR
 async function preprocessImageForOCR(buffer) {
@@ -71,19 +72,18 @@ function extractTextFromTxt(buffer) {
   }
 }
 
-// PDF processing - using OCR as a fallback
+// PDF processing
 async function extractTextFromPDF(buffer) {
   try {
-    // For now, treat PDFs as images and use OCR
-    console.log('Processing PDF using OCR...');
-    return await performOCR(buffer);
+    const data = await pdf(buffer);
+    return data.text.replace(/(\r\n|\n|\r)/gm, " ").replace(/\s+/g, " ").trim();
   } catch (error) {
     console.error('PDF processing error:', error);
     throw new Error('Failed to extract text from PDF');
   }
 }
 
-export {
+module.exports = {
   performOCR,
   extractTextFromWord,
   extractTextFromTxt,

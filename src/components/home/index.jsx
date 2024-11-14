@@ -11,7 +11,7 @@ const Home = () => {
       {/* Announcement Banner */}
       <div className="bg-blue-50 py-2 px-4 text-center">
         <span className="inline-flex items-center">
-          🎉 New: AI-powered keyword optimization <span className="ml-2">→</span>
+          New: AI-powered keyword optimization <span className="ml-2">→</span>
         </span>
       </div>
 
@@ -127,7 +127,7 @@ const Home = () => {
           </p>
           <Button 
             onClick={() => navigate('/upload')}
-            className="bg-white text-blue-600 hover:bg-blue-50 px-8"
+            className="bg-black text-white hover:bg-white hover:text-black transition-colors duration-200 px-8"
           >
             Upload Your Resume →
           </Button>
@@ -144,7 +144,7 @@ const Home = () => {
           <Link to="/contact" className="text-gray-600 hover:text-blue-600">Contact</Link>
         </div>
         <div className="text-gray-600">
-          © 2024 MatchPro Resume. All rights reserved.
+          2024 MatchPro Resume. All rights reserved.
         </div>
       </footer>
     </div>

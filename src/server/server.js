@@ -4,13 +4,24 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import OpenAI from 'openai';
 import apiRoutes from './api-routes.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Configure dotenv to read .env.local file
-dotenv.config({ path: '.env.local' });
+// Get directory name in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Configure dotenv to read .env file from project root
+console.log('Loading environment variables...');
+const envPath = path.resolve(__dirname, '../../.env');
+console.log('Environment file path:', envPath);
+dotenv.config({ path: envPath });
 
 // Verify environment variables
-if (!process.env.VITE_STRIPE_SECRET_KEY) {
-  console.error('Missing Stripe secret key');
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+if (!stripeSecretKey) {
+  console.error('Missing Stripe secret key. Please check your .env file');
+  console.log('Available environment variables:', Object.keys(process.env));
   process.exit(1);
 }
 
@@ -20,16 +31,29 @@ if (!process.env.OPENAI_API_KEY) {
 }
 
 const app = express();
+const port = process.env.PORT || 3000;
 
-// Initialize Stripe and OpenAI
-const stripe = new Stripe(process.env.VITE_STRIPE_SECRET_KEY);
-const openai = new OpenAI({
+// Initialize Stripe and OpenAI with detailed logging
+console.log('Initializing Stripe...');
+console.log('Stripe key type:', stripeSecretKey.startsWith('sk_test_') ? 'test' : 'live');
+export const stripe = new Stripe(stripeSecretKey, {
+  apiVersion: '2023-10-16',
+});
+
+console.log('Initializing OpenAI...');
+export const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
 // Middleware
 app.use(express.json());
 app.use(cors());
+
+// Log incoming requests
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
 
 // Root route
 app.get('/', (req, res) => {
@@ -51,107 +75,69 @@ app.get('/', (req, res) => {
 // API Routes
 app.use('/api', apiRoutes);
 
-// Stripe endpoints
-app.post('/api/create-checkout-session', async (req, res) => {
-  try {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: 'MatchPro Resume Premium Package',
-              description: 'Advanced ATS optimization and 10 resume optimizations'
-            },
-            unit_amount: 1999, // $19.99 in cents
-          },
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      success_url: `${process.env.VITE_BASEURL}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.VITE_BASEURL}/cancel`,
-    });
-
-    res.json({ url: session.url });
-  } catch (error) {
-    console.error('Error creating checkout session:', error);
-    res.status(500).json({ 
-      error: 'Failed to create checkout session',
-      details: error.message 
-    });
-  }
-});
-
-// Verify session endpoint
-app.post('/api/verify-session', async (req, res) => {
-  try {
-    const { sessionId } = req.body;
-    
-    if (!sessionId) {
-      console.log('No session ID provided');
-      return res.status(400).json({ error: 'Session ID is required' });
-    }
-
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
-    
-    if (session.payment_status === 'paid') {
-      res.json({ verified: true });
-    } else {
-      res.status(400).json({ 
-        error: 'Payment not verified',
-        status: session.payment_status 
-      });
-    }
-  } catch (error) {
-    console.error('Error verifying session:', error);
-    res.status(500).json({ 
-      error: 'Failed to verify session',
-      details: error.message 
-    });
-  }
-});
-
-// Health check endpoint
+// Health check endpoint with detailed info
 app.get('/api/health', (req, res) => {
+  const stripeMode = stripeSecretKey.startsWith('sk_test_') ? 'test' : 'live';
+  console.log(`Health check - Stripe mode: ${stripeMode}`);
+  
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    stripeMode: process.env.VITE_STRIPE_SECRET_KEY.startsWith('sk_test_') ? 'test' : 'live'
+    stripeMode,
+    environment: process.env.NODE_ENV || 'development',
+    apiVersion: {
+      stripe: stripe.VERSION,
+      server: '1.0.0'
+    }
   });
 });
 
-// Error handling middleware
+// Error handling middleware with detailed logging
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
+  const timestamp = new Date().toISOString();
+  console.error(`${timestamp} - Unhandled error:`, err);
+  console.error('Request details:', {
+    method: req.method,
+    url: req.url,
+    headers: req.headers,
+    body: req.body
+  });
+  
   res.status(500).json({ 
     error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'An unexpected error occurred'
+    message: process.env.NODE_ENV === 'development' ? err.message : 'An unexpected error occurred',
+    timestamp,
+    requestId: req.id
   });
 });
 
-// Handle 404s
+// Handle 404s with logging
 app.use((req, res) => {
+  console.log(`404 - Not Found: ${req.method} ${req.url}`);
   res.status(404).json({ 
     error: 'Not Found',
-    message: `Cannot ${req.method} ${req.url}`
+    message: `Cannot ${req.method} ${req.url}`,
+    timestamp: new Date().toISOString()
   });
 });
 
-// Start server
-const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Visit http://localhost:${PORT} to see API status`);
-  console.log(`Using Stripe key type: ${process.env.VITE_STRIPE_SECRET_KEY.startsWith('sk_test_') ? 'test' : 'live'}`);
-  console.log(`Server environment: ${process.env.NODE_ENV || 'development'}`);
+// Start server with health check
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+  console.log(`Server URL: http://localhost:${port}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Stripe mode: ${stripeSecretKey.startsWith('sk_test_') ? 'test' : 'live'}`);
+  
+  // Verify Stripe connection
+  stripe.paymentMethods.list({ limit: 1 })
+    .then(() => console.log('✓ Stripe connection verified'))
+    .catch(err => console.error('✗ Stripe connection failed:', err.message));
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
+  app.close(() => {
     console.log('Server closed');
     process.exit(0);
   });
