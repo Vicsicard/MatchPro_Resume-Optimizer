@@ -6,6 +6,7 @@ import OpenAI from 'openai';
 import apiRoutes from './api-routes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import stripeWebhookRouter from './stripe-webhook.js';
 
 // Get directory name in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -46,8 +47,14 @@ export const openai = new OpenAI({
 });
 
 // Middleware
-app.use(express.json());
 app.use(cors());
+
+// Use the Stripe webhook router
+// This should be before the express.json() middleware to properly handle Stripe webhooks
+app.use('/api', stripeWebhookRouter);
+
+// Parse JSON requests
+app.use(express.json());
 
 // Log incoming requests
 app.use((req, res, next) => {
@@ -58,7 +65,7 @@ app.use((req, res, next) => {
 // Root route
 app.get('/', (req, res) => {
   res.json({ 
-    message: 'MatchPro Resume API Server',
+    message: 'Resume Optimizer API Server',
     status: 'running',
     version: '1.0.0',
     endpoints: {

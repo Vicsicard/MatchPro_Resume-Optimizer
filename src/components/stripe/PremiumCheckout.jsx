@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
 import { Button } from '../ui/button';
+import { useUser } from '../../hooks/useUser';
 
-const PremiumCheckout = () => {
+const PremiumCheckout = ({ priceId, credits }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const { user } = useUser();
 
   const handleCheckout = async () => {
     try {
+      if (!user?.id) {
+        throw new Error('Please sign in to purchase credits');
+      }
+
       setIsLoading(true);
       setError('');
       
-      console.log('Starting checkout process...');
+      console.log('Starting checkout process...', { priceId, credits });
       
       const response = await fetch('http://localhost:3000/api/create-checkout-session', {
         method: 'POST',
@@ -19,7 +25,10 @@ const PremiumCheckout = () => {
         },
         body: JSON.stringify({
           successUrl: `${window.location.origin}/upload`,
-          cancelUrl: `${window.location.origin}/pricing`
+          cancelUrl: `${window.location.origin}/pricing`,
+          userId: user.id,
+          priceId,
+          credits
         })
       });
 
@@ -49,21 +58,19 @@ const PremiumCheckout = () => {
   };
 
   return (
-    <div className="space-y-4">
-      <Button 
+    <div className="flex flex-col items-center space-y-4">
+      {error && (
+        <div className="text-red-500 bg-red-100 p-3 rounded-md mb-4 text-sm">
+          {error}
+        </div>
+      )}
+      <Button
         onClick={handleCheckout}
         disabled={isLoading}
         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold"
       >
-        {isLoading ? 'Processing...' : 'Get Premium Access'}
+        {isLoading ? 'Processing...' : `Get ${credits} Credits`}
       </Button>
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-          <p className="text-sm text-red-600">
-            {error}
-          </p>
-        </div>
-      )}
     </div>
   );
 };

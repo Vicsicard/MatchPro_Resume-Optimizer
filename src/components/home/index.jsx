@@ -58,7 +58,7 @@ const Home = () => {
 
       {/* Features Section */}
       <div className="container mx-auto px-4 py-20 text-center">
-        <h2 className="text-3xl font-bold mb-16">Why Choose MatchPro Resume?</h2>
+        <h2 className="text-3xl font-bold mb-16">Why Choose Resume Optimizer?</h2>
         <div className="text-center mb-20">
           <p className="text-xl mb-4">Join thousands of successful job seekers who've landed their dream jobs</p>
         </div>

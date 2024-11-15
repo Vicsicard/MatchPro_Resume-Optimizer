@@ -11,8 +11,8 @@ export async function createCheckoutSession(req, res) {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: 'MatchPro Resume Premium Package',
-              description: 'Access to premium resume optimization features with 10 optimizations',
+              name: 'Resume Optimizer Starter',
+              description: 'Access to starter resume optimization features with 10 optimizations',
             },
             unit_amount: 1999, // $19.99 in cents
           },

@@ -42,7 +42,7 @@ export default function AuthPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
       <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
         <h2 className="text-2xl font-bold text-center mb-8">
-          Sign in to MatchPro Resume
+          Sign in to Resume Optimizer
         </h2>
         <form onSubmit={handleLogin} className="space-y-6">
           <div>

@@ -35,7 +35,7 @@ app.use('/api', apiRoutes);
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
-    message: 'MatchPro Resume API Server',
+    message: 'Resume Optimizer API Server',
     status: 'running',
     version: '1.0.0',
     endpoints: {

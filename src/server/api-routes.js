@@ -212,16 +212,24 @@ router.post('/create-checkout-session', async (req, res) => {
   try {
     console.log('Creating checkout session...');
     console.log('Request body:', req.body);
-    console.log('Environment variables:', {
-      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ? 'Set' : 'Not set',
-      VITE_STRIPE_PRICE_ID: process.env.VITE_STRIPE_PRICE_ID
-    });
     
-    const { successUrl, cancelUrl } = req.body;
+    const { successUrl, cancelUrl, userId, priceId, credits } = req.body;
     
-    // Hardcode the test price ID
-    const priceId = 'price_1QL9lbGEHfPiJwM4RHobn8DD';
-    console.log('Using hardcoded test price ID:', priceId);
+    if (!userId) {
+      throw new Error('User ID is required for checkout');
+    }
+
+    // Map of price IDs to their respective Stripe price IDs
+    const priceIds = {
+      price_starter: 'price_starter_id', // 20 credits for $19.99
+      price_professional: 'price_professional_id', // 50 credits for $39.99
+      price_enterprise: 'price_enterprise_id' // 200 credits for $99.99
+    };
+
+    const stripePriceId = priceIds[priceId];
+    if (!stripePriceId) {
+      throw new Error('Invalid price ID');
+    }
 
     // Use provided URLs or fallback to environment variables
     const baseUrl = process.env.VITE_BASEURL || 'http://localhost:5173';
@@ -229,16 +237,18 @@ router.post('/create-checkout-session', async (req, res) => {
     const finalCancelUrl = cancelUrl || `${baseUrl}/pricing`;
     
     console.log('Creating session with:', {
-      priceId,
+      priceId: stripePriceId,
       successUrl: finalSuccessUrl,
-      cancelUrl: finalCancelUrl
+      cancelUrl: finalCancelUrl,
+      userId,
+      credits
     });
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
-          price: priceId,
+          price: stripePriceId,
           quantity: 1,
         },
       ],
@@ -246,6 +256,8 @@ router.post('/create-checkout-session', async (req, res) => {
       success_url: `${finalSuccessUrl}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: finalCancelUrl,
       metadata: {
+        userId,
+        credits,
         product_type: 'premium_package',
         created_at: new Date().toISOString()
       },
