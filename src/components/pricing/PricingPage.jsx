@@ -1,139 +1,146 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import PremiumCheckout from '../stripe/PremiumCheckout';
 import { Check } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+import FingerprintJS from '@fingerprintjs/fingerprintjs';
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
 const PricingPage = () => {
   const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  const [hasUsedTrial, setHasUsedTrial] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [deviceFingerprint, setDeviceFingerprint] = useState(null);
 
-  const handleFreeTrial = () => {
-    navigate('/upload');
+  useEffect(() => {
+    // Check authentication status
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setUser(user);
+        
+        if (user) {
+          // Check if user has used free trial
+          const { data, error } = await supabase
+            .from('user_trial_table')  
+            .select('used_trial')
+            .eq('user_id', user.id)
+            .single();
+          
+          if (error && error.code !== 'PGRST116') {
+            console.error('Error checking trial status:', error);
+          }
+          
+          setHasUsedTrial(data?.used_trial ?? false);
+        }
+      } catch (error) {
+        console.error('Error checking auth status:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  useEffect(() => {
+    // Initialize fingerprint detection
+    const initFingerprint = async () => {
+      const fp = await FingerprintJS.load();
+      const result = await fp.get();
+      setDeviceFingerprint(result.visitorId);
+    };
+    initFingerprint();
+  }, []);
+
+  const checkTrialEligibility = async () => {
+    if (!user) return false;
+
+    // Check IP-based trials
+    const { data: ipTrials, error: ipError } = await supabase
+      .from('user_trial_table')
+      .select('created_at')
+      .eq('ip_address', await fetch('https://api.ipify.org?format=json').then(r => r.json()).then(data => data.ip))
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (ipError) {
+      console.error('Error checking IP trials:', ipError);
+      return false;
+    }
+
+    // If we find multiple trials from same IP in short period, flag as potential abuse
+    if (ipTrials?.length >= 3) {
+      const mostRecent = new Date(ipTrials[0].created_at);
+      const oldest = new Date(ipTrials[ipTrials.length - 1].created_at);
+      const daysBetween = (mostRecent - oldest) / (1000 * 60 * 60 * 24);
+      
+      if (daysBetween < 7) {
+        alert('Too many trial attempts detected. Please contact support if you believe this is an error.');
+        return false;
+      }
+    }
+
+    // Check device fingerprint
+    const { data: deviceTrials, error: deviceError } = await supabase
+      .from('user_trial_table')
+      .select('created_at')
+      .eq('device_fingerprint', deviceFingerprint)
+      .limit(1);
+
+    if (deviceError) {
+      console.error('Error checking device trials:', deviceError);
+      return false;
+    }
+
+    if (deviceTrials?.length > 0) {
+      alert('A trial has already been used on this device.');
+      return false;
+    }
+
+    return true;
   };
 
-  const pricingTiers = [
-    {
-      name: 'Free Trial',
-      price: '$0',
-      credits: 1,
-      features: [
-        '1 resume optimization',
-        'Basic ATS analysis',
-        'Standard formatting'
-      ],
-      action: handleFreeTrial,
-      buttonText: 'Start Free Trial',
-      priceId: null
-    },
-    {
-      name: 'Starter',
-      price: '$19.99',
-      credits: 20,
-      features: [
-        '20 resume optimizations',
-        'Advanced ATS optimization',
-        'AI-powered suggestions',
-        'Premium formatting templates'
-      ],
-      priceId: import.meta.env.VITE_STRIPE_PRICE_STARTER
-    },
-    {
-      name: 'Professional',
-      price: '$39.99',
-      credits: 50,
-      features: [
-        '50 resume optimizations',
-        'Advanced ATS optimization',
-        'AI-powered suggestions',
-        'Premium formatting templates',
-        'Priority support'
-      ],
-      priceId: import.meta.env.VITE_STRIPE_PRICE_PROFESSIONAL,
-      popular: true
-    },
-    {
-      name: 'Enterprise',
-      price: '$99.99',
-      credits: 200,
-      features: [
-        '200 resume optimizations',
-        'Advanced ATS optimization',
-        'AI-powered suggestions',
-        'Premium formatting templates',
-        'Priority support',
-        'Bulk processing'
-      ],
-      priceId: import.meta.env.VITE_STRIPE_PRICE_ENTERPRISE
+  const handleFreeTrial = async () => {
+    if (!user) {
+      navigate('/auth', { state: { returnTo: '/pricing' } });
+      return;
     }
-  ];
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      {/* Hero Section */}
-      <div className="bg-blue-600 py-20">
-        <div className="container mx-auto text-center text-white">
-          <h1 className="text-4xl font-bold mb-4">Simple, Transparent Pricing</h1>
-          <p className="text-xl opacity-90">Choose the plan that's right for you</p>
-        </div>
-      </div>
+    if (hasUsedTrial) {
+      alert('You have already used your free trial. Please choose a paid plan to continue.');
+      return;
+    }
 
-      {/* Pricing Cards */}
-      <div className="container mx-auto px-4 py-16">
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto -mt-16">
-          {pricingTiers.map((tier, index) => (
-            <Card key={index} className={`shadow-lg ${tier.popular ? 'border-blue-500 border-2' : 'border-blue-200'} relative`}>
-              {tier.popular && (
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
-                    Most Popular
-                  </span>
-                </div>
-              )}
-              <CardHeader>
-                <CardTitle className="text-2xl">{tier.name}</CardTitle>
-                <div className="mt-2">
-                  <p className="text-3xl font-bold">{tier.price}</p>
-                  <p className="text-gray-600 text-sm mt-1">{tier.credits} credits</p>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <ul className="space-y-2">
-                    {tier.features.map((feature, featureIndex) => (
-                      <li key={featureIndex} className="flex items-center gap-2">
-                        <Check className="text-green-500" size={20} />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  {tier.priceId ? (
-                    <PremiumCheckout priceId={tier.priceId} credits={tier.credits} />
-                  ) : (
-                    <Button 
-                      onClick={tier.action}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold"
-                    >
-                      {tier.buttonText}
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
+    const isEligible = await checkTrialEligibility();
+    if (!isEligible) return;
 
-      {/* Footer Section */}
-      <div className="container mx-auto px-4 py-16 text-center">
-        <h2 className="text-2xl font-bold mb-4">100% Satisfaction Guaranteed</h2>
-        <p className="text-gray-600 max-w-2xl mx-auto">
-          Try our premium service risk-free. If you're not completely satisfied with your optimized resume,
-          we'll make it right or give you a full refund.
-        </p>
-      </div>
-    </div>
-  );
-};
+    try {
+      const ip = await fetch('https://api.ipify.org?format=json').then(r => r.json()).then(data => data.ip);
+      
+      const { error } = await supabase
+        .from('user_trial_table')
+        .upsert({ 
+          user_id: user.id, 
+          used_trial: true,
+          trial_start_date: new Date().toISOString(),
+          ip_address: ip,
+          device_fingerprint: deviceFingerprint
+        });
 
-export default PricingPage;
+      if (error) throw error;
+      navigate('/upload');
+    } catch (error) {
+      console.error('Error recording trial usage:', error);
+      alert('There was an error starting your trial. Please try again.');
+    }
+  };
+
+{{ ... }}
