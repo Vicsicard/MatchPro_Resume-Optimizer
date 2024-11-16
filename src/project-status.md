@@ -185,7 +185,125 @@ VITE_STRIPE_PRICE_ID=price_1OocvBGEHfPiJwM4jUjJXaKh
 - Confirm Stripe dashboard configuration for test mode price ID
 - Continue debugging server-side error handling for checkout session creation
 
-### Product Configuration Update
+### Supabase Configuration
+#### Authentication Settings
+- **Site URL**: `http://localhost:5174`
+- **Redirect URLs**: 
+  - `http://localhost:5174/**`
+  - `http://localhost:5174/auth-callback`
+  - `http://localhost:5174/auth-confirmation`
+- **JWT Settings**:
+  - Access token expiry: 3600 seconds (1 hour)
+  - Refresh token reuse interval: 10 seconds
+- **Password Requirements**:
+  - Minimum length: 6 characters
+  - No special character requirements
+
+#### Email Configuration
+- **Sender**: info@digitalrascalmarketing.com
+- **Name**: MatchPro Resume
+- **SMTP Settings**:
+  - Host: smtp.mailchannels.net
+  - Port: 25
+  - Minimum interval: 60 seconds
+
+### Database Schema
+#### Tables
+1. **auth.users** (Supabase Built-in)
+   - Used for authentication and user management
+   - Referenced by other tables for user relationships
+
+2. **user_credits**
+   ```sql
+   create table public.user_credits (
+       id uuid primary key default uuid_generate_v4(),
+       user_id uuid references auth.users(id) not null unique,
+       credits_remaining integer not null default 10,
+       total_optimizations integer not null default 0,
+       created_at timestamptz default now() not null,
+       updated_at timestamptz default now() not null
+   );
+   ```
+
+3. **user_optimizations**
+   ```sql
+   create table public.user_optimizations (
+       id uuid default uuid_generate_v4() primary key,
+       user_id uuid references auth.users not null,
+       remaining_optimizations integer default 0,
+       total_optimizations integer default 0,
+       last_purchase_date timestamptz default now(),
+       created_at timestamptz default now(),
+       constraint user_optimizations_user_id_key unique (user_id)
+   );
+   ```
+
+4. **user_trial_table**
+   ```sql
+   create table public.user_trial_table (
+       id uuid default gen_random_uuid() primary key,
+       user_id uuid references auth.users(id) not null,
+       used_trial boolean default false,
+       trial_start_date timestamptz,
+       created_at timestamptz default now()
+   );
+   ```
+
+5. **resumes**
+   ```sql
+   create table resumes (
+       id uuid primary key default uuid_generate_v4(),
+       user_id uuid not null references users(id) on delete cascade,
+       original_filename text not null,
+       storage_path text not null,
+       optimized_storage_path text,
+       created_at timestamptz not null default now(),
+       updated_at timestamptz not null default now(),
+       status text not null default 'pending'
+   );
+   ```
+
+### Row Level Security (RLS)
+#### Policies
+1. **user_credits**
+   - Users can view their own credits
+   - Users can update their own credits
+
+2. **user_optimizations**
+   - Users can view their own optimization data
+   - Users can update their own optimization data
+   - System can insert optimization records
+
+3. **user_trial_table**
+   - Users can read their own trial status
+   - Users can update their own trial status
+
+4. **resumes**
+   - Users can view own resumes
+   - Users can insert own resumes
+   - Users can update own resumes
+
+### Database Functions
+#### handle_new_user
+- Triggered after new user creation
+- Creates initial credit allocation
+- Sets up trial status
+
+### Authentication Flow
+1. User signs up with email/password
+2. Confirmation email sent
+3. User confirms email
+4. Initial credits (10) automatically assigned
+5. Trial status initialized
+
+### Technical Configuration
+#### Environment Setup
+- Backend server: Port 3002
+- Frontend (Vite): Port 5174
+- Supabase connection configured in `supabase/client.js`
+- Environment variables in `.env.local`
+
+## Product Configuration Update
 - Integrated new Stripe products and prices:
   - Starter ($19.99): price_1QL9lbGEHfPiJwM4RHobn8DD
   - Professional ($39.99): price_1QLDUEGEHfPiJwM4f44jHHOr
@@ -325,133 +443,66 @@ node server/static-server.js
 
 _Last Updated: [Current Timestamp]_
 
-## Latest Updates (November 14, 2024)
+## Latest Updates (February 2024)
 
-### Authentication System Overhaul
-- Implemented comprehensive user authentication flow
-- Added secure password hashing using bcryptjs
-- Created dedicated free-tier signup process
-- Added `is_password_set` flag for Stripe customers
-- Improved email normalization and validation
+### Authentication System Enhancements
+#### Free Signup Implementation
+- Completed robust free signup implementation with dual-environment support
+- Fixed credit initialization issues in production environment
+- Added comprehensive error handling and validation
+- Implemented proper password hashing and email verification
+- Enhanced security with Row Level Security policies
 
-### Credit System Implementation
-#### Free Tier
-- Implemented one free credit for new users
-- Created `useCredits` hook for credit management
-- Added credit display in upload interface
-- Automatic redirect to pricing after credit usage
+#### Credit System Improvements
+- Fixed credit initialization trigger to work with both auth methods
+- Added safeguards against duplicate credit entries
+- Implemented automatic credit assignment for new users
+- Enhanced credit tracking reliability in production
 
-#### Credit Management
-- Real-time credit tracking and updates
-- Secure credit deduction system
-- Clear credit visibility in UI
-- Seamless transition to paid tier
+### Database Improvements
+#### Trigger System
+- Created new trigger `on_supabase_auth_user_created` for Supabase auth
+- Enhanced `handle_new_user()` function with duplicate prevention
+- Added safety checks for credit initialization
+- Implemented proper error handling in triggers
 
-### Database Enhancements
-- Added `is_password_set` column to auth_users
-- Created migration scripts for schema updates
-- Enhanced Row Level Security policies
-- Improved user credits initialization
+#### Security Enhancements
+- Strengthened Row Level Security policies
+- Added proper user isolation in credit system
+- Implemented secure password handling
+- Enhanced data integrity constraints
 
-### Component Updates
-#### New Components
-- `/components/auth/FreeSignup.jsx`: Free-tier user registration
-- `/hooks/useCredits.js`: Credit management hook
-- `/db/migrations/001_add_password_set_flag.sql`: Schema migration
+### Next Steps
 
-#### Modified Components
-- `/components/upload/UploadPage.jsx`: Added credit integration
-- `/components/home/index.jsx`: Updated free signup flow
-- `/App.jsx`: Added new authentication routes
-- `/db/init.sql`: Updated schema initialization
+#### Premium Plan Authentication
+1. Create PremiumSignup Component
+   - Implement Stripe integration for payment processing
+   - Add premium plan selection interface
+   - Create premium-specific user flow
+   - Implement premium credit allocation
 
-### Security Improvements
-- Secure password hashing implementation
-- Email address normalization
-- Enhanced input validation
-- Improved error handling
-- Secure credit management
+2. Premium Features
+   - Define premium user benefits
+   - Implement premium-only features
+   - Create upgrade path from free to premium
+   - Add premium user dashboard
 
-### UI/UX Enhancements
-- Clear credit display
-- Improved error messaging
-- Better loading states
-- Consistent styling across new components
-- Intuitive user flow
+3. Payment Processing
+   - Set up Stripe webhook handling
+   - Implement payment confirmation flow
+   - Add premium plan subscription management
+   - Create billing history interface
 
-### Technical Configuration
-#### Environment Setup
-- Backend server properly loading variables from `src/.env.local`
-- Frontend accessing Stripe public key and price ID through Vite env vars
-- Supabase configuration properly initialized
+4. Security & Testing
+   - Implement comprehensive testing for premium flow
+   - Add payment verification safeguards
+   - Create premium user migration process
+   - Test credit system with premium accounts
 
-### Known Issues
-- Password reset functionality pending
-- Multi-factor authentication not implemented
-- Limited error logging
-- Basic session management
+### Current Development Focus
+- Completing premium signup implementation
+- Enhancing payment processing integration
+- Implementing premium feature set
+- Creating seamless upgrade experience
 
-## Current Priorities
-1. Implement password reset functionality
-2. Add comprehensive error logging
-3. Enhance session management
-4. Implement multi-factor authentication
-5. Add user activity tracking
-
-## Completed Features
-1. Secure user authentication
-2. Free-tier credit system
-3. Credit tracking and management
-4. Password hashing
-5. Basic session handling
-
-## Technical Debt
-1. Implement proper password reset
-2. Add comprehensive input validation
-3. Create more robust error handling
-4. Develop password reset mechanism
-5. Add multi-factor authentication
-
-## Security Recommendations
-1. Implement rate limiting
-2. Add CSRF protection
-3. Use HTTPS for all endpoints
-4. Regular security audits
-5. Implement comprehensive input validation
-
-## Next Development Phase
-1. Enhanced error messaging
-2. Password reset functionality
-3. Multi-factor authentication
-4. User activity logging
-5. Analytics integration
-
-### Components Created/Modified
-- `/src/config/supabaseClient.js`: Main Supabase configuration
-- `/src/components/auth/FreeSignup.jsx`: Free tier signup
-- `/src/components/auth/AuthPage.jsx`: Main authentication
-- `/src/hooks/useCredits.js`: Credit management
-- `/src/components/upload/UploadPage.jsx`: Upload interface
-- `/src/db/migrations/001_add_password_set_flag.sql`: Schema migration
-- `/src/db/init.sql`: Database initialization
-
-## Testing Requirements
-1. Verify free credit allocation
-2. Test credit deduction flow
-3. Validate password hashing
-4. Check error handling
-5. Verify pricing page redirect
-
-## Environmental Configuration
-Required Environment Variables:
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
-- `VITE_STRIPE_PUBLIC_KEY`
-- `VITE_PRICE_ID`
-
-## Documentation Needs
-1. User authentication flow
-2. Credit system implementation
-3. Database schema changes
-4. Security measures
-5. Environment setup
+{{ ... }}

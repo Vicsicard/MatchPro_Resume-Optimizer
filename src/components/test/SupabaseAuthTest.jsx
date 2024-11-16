@@ -5,83 +5,152 @@ const SupabaseAuthTest = () => {
   const [testEmail, setTestEmail] = useState('');
   const [testPassword, setTestPassword] = useState('');
   const [status, setStatus] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Test connection on component mount
-    const testConnection = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        setStatus(`Connected successfully. Session: ${data?.session ? 'Active' : 'None'}`);
-        console.log('Connection successful');
-      } catch (error) {
-        setStatus(`Connection error: ${error.message}`);
-        console.error('Connection error:', error);
-      }
-    };
+    checkUser();
+    
+    // Subscribe to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
 
-    testConnection();
+    return () => subscription.unsubscribe();
   }, []);
+
+  const checkUser = async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      setUser(session?.user ?? null);
+      setStatus(session ? 'Authenticated' : 'Not authenticated');
+    } catch (error) {
+      console.error('Session check error:', error);
+      setStatus('Error checking session');
+    }
+  };
 
   const handleSignUp = async (e) => {
     e.preventDefault();
+    if (!testEmail || !testPassword) {
+      setStatus('Please fill in all fields');
+      return;
+    }
+
     try {
-      setStatus('Attempting signup...');
+      setLoading(true);
+      setStatus('Signing up...');
       
       const { data, error } = await supabase.auth.signUp({
         email: testEmail,
         password: testPassword,
         options: {
-          emailRedirectTo: 'http://localhost:5174/auth-callback'
+          emailRedirectTo: window.location.origin + '/auth-callback',
+          data: {
+            signup_date: new Date().toISOString(),
+          }
         }
       });
 
       if (error) throw error;
       
-      setStatus('Signup successful! Check email for confirmation.');
+      setStatus('Please check your email for the confirmation link!');
       console.log('Signup successful:', data);
       
     } catch (error) {
-      setStatus(`Signup error: ${error.message}`);
-      console.error('Signup error details:', {
-        message: error.message,
-        status: error.status,
-        name: error.name
+      setStatus(`Error: ${error.message}`);
+      console.error('Signup error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignIn = async (e) => {
+    e.preventDefault();
+    if (!testEmail || !testPassword) {
+      setStatus('Please fill in all fields');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setStatus('Signing in...');
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: testEmail,
+        password: testPassword,
       });
+
+      if (error) throw error;
+      
+      setStatus('Signed in successfully!');
+      setUser(data.user);
+      
+    } catch (error) {
+      setStatus(`Error: ${error.message}`);
+      console.error('Sign in error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setStatus('Signed out successfully');
+      setUser(null);
+    } catch (error) {
+      setStatus(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '500px', margin: '0 auto' }}>
-      <h2>Supabase Auth Test</h2>
-      
-      <div style={{ marginBottom: '20px' }}>
-        <strong>Status:</strong> {status}
+    <div className="auth-container">
+      <h2>Authentication Test</h2>
+      <div className="status-box">
+        <p>Status: {status}</p>
+        {user && (
+          <div className="user-info">
+            <p>User: {user.email}</p>
+            <p>ID: {user.id}</p>
+            <button onClick={handleSignOut} disabled={loading}>
+              Sign Out
+            </button>
+          </div>
+        )}
       </div>
 
-      <form onSubmit={handleSignUp} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <input
-          type="email"
-          value={testEmail}
-          onChange={(e) => setTestEmail(e.target.value)}
-          placeholder="Email"
-          required
-          style={{ padding: '8px' }}
-        />
-        
-        <input
-          type="password"
-          value={testPassword}
-          onChange={(e) => setTestPassword(e.target.value)}
-          placeholder="Password"
-          required
-          style={{ padding: '8px' }}
-        />
-        
-        <button type="submit" style={{ padding: '8px', cursor: 'pointer' }}>
-          Test Signup
-        </button>
-      </form>
+      {!user && (
+        <form onSubmit={handleSignUp} className="auth-form">
+          <input
+            type="email"
+            placeholder="Email"
+            value={testEmail}
+            onChange={(e) => setTestEmail(e.target.value)}
+            disabled={loading}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={testPassword}
+            onChange={(e) => setTestPassword(e.target.value)}
+            disabled={loading}
+          />
+          <div className="button-group">
+            <button type="submit" disabled={loading}>
+              Sign Up
+            </button>
+            <button type="button" onClick={handleSignIn} disabled={loading}>
+              Sign In
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
 };

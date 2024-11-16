@@ -1,34 +1,71 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../../config/supabaseClient';
 import bcryptjs from 'bcryptjs';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+const isDevelopment = import.meta.env.DEV;
 
-const SALT_ROUNDS = 10;
+// Development-only auth simulation
+const devAuth = {
+  signUp: async (email, password) => {
+    // Simulate a delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const userId = 'dev-' + Date.now();
+    
+    // Store dev credentials
+    localStorage.setItem('dev_user', JSON.stringify({
+      id: userId,
+      email,
+      created_at: new Date().toISOString(),
+      last_sign_in_at: new Date().toISOString()
+    }));
+
+    // Store dev credits
+    localStorage.setItem('dev_credits', JSON.stringify({
+      credits_remaining: 1,
+      total_optimizations: 0
+    }));
+    
+    localStorage.setItem('user_id', userId);
+    
+    return { data: { user: { id: userId, email } }, error: null };
+  }
+};
 
 export default function FreeSignup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
+  const initializeUserCredits = async (userId) => {
+    try {
+      const { error } = await supabase
+        .from('user_credits')
+        .insert([
+          {
+            user_id: userId,
+            credits_remaining: 1,
+            total_optimizations: 0
+          }
+        ]);
+      
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error initializing credits:', err);
+      // Continue anyway since this is just credits initialization
+    }
+  };
+
   const handleSignup = async (e) => {
     e.preventDefault();
     
-    // Validate password
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
-      return;
-    }
-    
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
       return;
     }
 
@@ -36,152 +73,120 @@ export default function FreeSignup() {
       setLoading(true);
       setError(null);
 
-      // Check if user already exists
-      const { data: existingUser } = await supabase
-        .from('auth_users')
-        .select('id')
-        .eq('email', email.toLowerCase())
-        .single();
-
-      if (existingUser) {
-        throw new Error('An account with this email already exists. Please log in instead.');
-      }
-
-      // Hash the password
-      const hashedPassword = await bcryptjs.hash(password, SALT_ROUNDS);
-
-      // Create new user
-      const { data: newUser, error: createError } = await supabase
-        .from('auth_users')
-        .insert([{ 
-          email: email.toLowerCase(),
-          password_hash: hashedPassword,
-          is_password_set: true,
-          is_verified: false,
-          last_login: new Date().toISOString()
-        }])
-        .select()
-        .single();
-
-      if (createError) {
-        throw new Error('Failed to create account');
-      }
-
-      // Initialize user credits
-      const { error: creditsError } = await supabase
-        .from('user_credits')
-        .insert([{
-          user_id: newUser.id,
-          credits_remaining: 1, // Free users get 1 credit
-          total_optimizations: 0
-        }]);
-
-      if (creditsError) {
-        console.error('Failed to initialize credits:', creditsError);
-      }
-
-      // Store session info
-      localStorage.setItem('user_id', newUser.id);
-      localStorage.setItem('user_email', newUser.email);
-      localStorage.setItem('auth_token', btoa(newUser.id));
+      let signUpResult;
       
-      // Redirect to upload page
-      navigate('/upload');
-    } catch (error) {
-      console.error('Signup error:', error);
-      setError(error.message);
+      if (isDevelopment) {
+        // Use dev auth in development
+        signUpResult = await devAuth.signUp(email, password);
+        console.log('Development mode: Bypassing Supabase auth');
+      } else {
+        // First create the user in auth_users table
+        const hashedPassword = await bcryptjs.hash(password, 10);
+        const { error: userError } = await supabase
+          .from('auth_users')
+          .insert([{
+            email: email.toLowerCase(),
+            password_hash: hashedPassword,
+            is_password_set: true,
+            is_verified: false
+          }]);
+        
+        if (userError) throw userError;
+
+        // Then sign up with Supabase auth
+        signUpResult = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: 'https://your-production-url.com/auth-callback'
+          }
+        });
+
+        if (signUpResult.error) throw signUpResult.error;
+
+        if (signUpResult.data?.user?.id) {
+          await initializeUserCredits(signUpResult.data.user.id);
+        }
+      }
+
+      if (isDevelopment) {
+        navigate('/dashboard', { 
+          state: { message: 'Development mode: Email verification bypassed' } 
+        });
+      } else {
+        setError('Please check your email for the verification link');
+      }
+      
+    } catch (err) {
+      console.error('Signup error:', err);
+      setError(err.message || 'An error occurred during signup');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex flex-col items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-xl shadow-xl max-w-md w-full">
-        <h2 className="text-3xl font-bold text-center mb-2">
-          Create Free Account
-        </h2>
-        <p className="text-gray-600 text-center mb-8">
-          Get started with 1 free resume optimization
-        </p>
-        
-        <form onSubmit={handleSignup} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email address
-            </label>
-            <input
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="w-full max-w-md space-y-8 px-4 py-8">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold tracking-tight">
+            Create your account
+          </h2>
+          {isDevelopment && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Development Mode - Email verification bypassed
+            </p>
+          )}
+        </div>
+
+        <form onSubmit={handleSignup} className="space-y-4">
+          <div className="space-y-2">
+            <Input
+              id="email"
               type="email"
-              required
-              placeholder="you@example.com"
-              className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              placeholder="Email address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+              className="w-full"
             />
           </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <input
+          <div className="space-y-2">
+            <Input
+              id="password"
               type="password"
-              required
-              minLength={8}
-              placeholder="Create a password (min. 8 characters)"
-              className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Confirm Password
-            </label>
-            <input
-              type="password"
               required
-              minLength={8}
-              placeholder="Confirm your password"
-              className="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
+              className="w-full"
             />
           </div>
-          
           {error && (
-            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">
+            <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
               {error}
             </div>
           )}
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={loading}
+          >
+            {loading ? 'Creating account...' : 'Sign up'}
+          </Button>
 
-          <div className="flex flex-col space-y-4">
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Creating Account...' : 'Create Account'}
-            </button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Already have an account?</span>
-              </div>
-            </div>
-
+          <p className="text-center text-sm text-muted-foreground">
+            Already have an account?{' '}
             <button
               type="button"
               onClick={() => navigate('/auth')}
-              className="w-full flex justify-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+              className="font-medium text-primary hover:underline"
             >
-              Sign In
+              Sign in
             </button>
-          </div>
+          </p>
         </form>
       </div>
     </div>

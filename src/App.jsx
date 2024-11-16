@@ -1,6 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useUser } from './hooks/useUser';
+import { Routes, Route } from 'react-router-dom';
 import PricingPage from './components/pricing/PricingPage';
 import TestSupabase from './components/test/TestSupabase';
 import SupabaseAuthTest from './components/test/SupabaseAuthTest';
@@ -13,21 +12,9 @@ import About from './components/about/About';
 import Features from './components/features/Features';
 import AuthPage from './components/auth/AuthPage';
 import FreeSignup from './components/auth/FreeSignup';
-
-// Protected Route Component
-const ProtectedRoute = ({ children }) => {
-  const { user, isLoading } = useUser();
-
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
-  if (!user) {
-    return <Navigate to="/pricing" />;
-  }
-
-  return children;
-};
+import Dashboard from './components/dashboard/Dashboard';
+import AuthCallback from './components/auth/AuthCallback';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 
 const App = () => {
   return (
@@ -45,15 +32,24 @@ const App = () => {
         <Route path="/new-auth-test" element={<AuthTest />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/free-signup" element={<FreeSignup />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
 
         {/* Protected Routes */}
-        <Route
-          path="/upload"
+        <Route 
+          path="/dashboard" 
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/upload" 
           element={
             <ProtectedRoute>
               <UploadPage />
             </ProtectedRoute>
-          }
+          } 
         />
       </Routes>
     </div>

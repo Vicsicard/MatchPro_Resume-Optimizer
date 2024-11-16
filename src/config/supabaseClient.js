@@ -1,27 +1,53 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase configuration');
-  throw new Error('Missing Supabase configuration. Please check your .env file.');
+// Validate configuration
+if (!SUPABASE_ANON_KEY) {
+  throw new Error('Missing Supabase anonymous key. Please check your environment variables.');
 }
 
-// Create the Supabase client with minimal configuration
-const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+// Create Supabase client with enhanced configuration
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true
+    persistSession: true,
+    detectSessionInUrl: true,
+    storage: window.localStorage,
+    storageKey: 'matchpro-auth',
+    flowType: 'pkce',
+    debug: import.meta.env.DEV,
+    redirectTo: import.meta.env.DEV 
+      ? 'http://localhost:5175/auth-callback'
+      : 'https://your-production-url.com/auth-callback',
+    // Skip email verification in development
+    shouldCreateUser: () => import.meta.env.DEV,
+    skipEmailVerification: import.meta.env.DEV
+  },
+  global: {
+    headers: {
+      'x-client-info': 'matchpro-web@1.0.0'
+    }
+  },
+  db: {
+    schema: 'public'
   }
 });
 
-// Log configuration for debugging (without exposing full key)
-console.log('Supabase Configuration:', {
-  url: supabaseUrl,
-  keyLength: supabaseAnonKey?.length,
-  keyPrefix: supabaseAnonKey?.substring(0, 10)
+// Add auth state change listener
+supabase.auth.onAuthStateChange((event, session) => {
+  if (import.meta.env.DEV) {
+    console.log('Auth event:', event);
+    if (session?.user) {
+      console.log('User authenticated:', session.user.email);
+    }
+  }
+  
+  // Track session activity
+  if (event === 'SIGNED_IN' && session?.user) {
+    localStorage.setItem('matchpro-last-active', Date.now().toString());
+  }
 });
 
 export { supabase };

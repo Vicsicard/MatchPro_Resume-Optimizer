@@ -1,10 +1,4 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
-
-// Initialize Supabase client
-const supabase = createClient(
-    'https://flayyfibpsxcobykocsw.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZsYXl5ZmlicHN4Y29ieWtvY3N3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzAzOTgxOTUsImV4cCI6MjA0NTk3NDE5NX0.9Y9BvjdjXDvcQbBweiGMeJtTurtO9T1mNgKcScr3IaU'
-);
+import { supabase } from './config/supabaseClient';
 
 // Check if user is authenticated
 export async function requireAuth() {

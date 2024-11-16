@@ -1,12 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../../config/supabaseClient';
 import bcryptjs from 'bcryptjs';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
 
 const SALT_ROUNDS = 10;
 
