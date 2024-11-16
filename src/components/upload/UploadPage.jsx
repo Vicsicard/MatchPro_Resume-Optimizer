@@ -1,7 +1,17 @@
 import React, { useState } from 'react';
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { allowedFileTypes, handleFileUpload, handleOptimization, handleDownload, getFileTypeMessage } from './TempUploadHandlers';
+import { Button } from "../ui/button";
+import { Card } from "../ui/card";
+import { useNavigate } from 'react-router-dom';
+import { useCredits } from '../../hooks/useCredits';
+import {
+  allowedFileTypes,
+  handleFileUpload,
+  handleOptimization,
+  handlePreviewAndDownload,
+  handleDownload,
+  getFileTypeMessage,
+  ResumePreview
+} from './TempUploadHandlers';
 import { Check } from 'lucide-react';
 
 export default function UploadPage() {
@@ -9,200 +19,169 @@ export default function UploadPage() {
   const [jobPostingFile, setJobPostingFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [extractedText, setExtractedText] = useState({ resume: '', jobPosting: '' });
-  const [optimizedContent, setOptimizedContent] = useState('');
-  const [showResults, setShowResults] = useState(false);
+  const [optimizedContent, setOptimizedContent] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewData, setPreviewData] = useState(null);
+  const { credits, loading: creditsLoading, useCredit } = useCredits();
+  const navigate = useNavigate();
 
-  const handleFileChange = async (event, type) => {
+  const handleResumeUpload = async (event) => {
     const file = event.target.files[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!allowedFileTypes[type].includes(file.type)) {
-      setError(`Invalid file type. ${getFileTypeMessage(type)}`);
-      return;
-    }
-
-    // Validate file size (10MB limit)
-    if (file.size > 10 * 1024 * 1024) {
-      setError('File size exceeds 10MB limit');
-      return;
-    }
-
-    setError('');
-    const states = {
-      setIsLoading,
+    await handleFileUpload(file, 'resume', {
       setError,
-      setExtractedText,
-      setResumeFile,
-      setJobPostingFile,
-    };
+      setFile: setResumeFile
+    });
+  };
 
-    await handleFileUpload(file, type, states);
+  const handleJobPostingUpload = async (event) => {
+    const file = event.target.files[0];
+    await handleFileUpload(file, 'jobPosting', {
+      setError,
+      setFile: setJobPostingFile
+    });
   };
 
   const handleOptimizeClick = async () => {
-    const states = {
-      setIsLoading,
-      setError,
-      setOptimizedContent,
-      setShowResults,
-    };
+    // Check if user has credits before proceeding
+    const hasCredits = await useCredit();
+    if (!hasCredits) {
+      return;
+    }
 
-    await handleOptimization(resumeFile, jobPostingFile, extractedText, states);
+    const optimizedContent = await handleOptimization(
+      resumeFile,
+      jobPostingFile,
+      {
+        setError,
+        setIsOptimizing: setIsLoading,
+        setOptimizedContent
+      }
+    );
+
+    if (optimizedContent) {
+      const previewData = await handlePreviewAndDownload(
+        optimizedContent,
+        {
+          setError,
+          setPreviewUrl,
+          setIsPreviewLoading
+        }
+      );
+      setPreviewData(previewData);
+    }
   };
 
-  const handleDownloadClick = () => {
-    handleDownload(optimizedContent, setError);
+  const handleDownloadClick = async () => {
+    await handleDownload(previewData, setError);
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Announcement Banner */}
-      <div className="bg-blue-50 py-2 px-4 text-center">
-        <span className="inline-flex items-center">
-          🎉 Ready to optimize your resume with AI? Let's get started!
-        </span>
-      </div>
-
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-12">
-        <h1 className="text-4xl font-bold text-center mb-4">
-          Resume Optimizer
-        </h1>
-        <p className="text-gray-600 text-center mb-12 max-w-2xl mx-auto">
-          Upload your resume and job posting below to get AI-powered optimization suggestions
-        </p>
-
-        {/* File Upload Section */}
-        <div className="grid md:grid-cols-2 gap-8 mb-8 max-w-4xl mx-auto">
-          {/* Resume Upload */}
-          <Card className="p-6 border border-gray-200 hover:border-blue-200 transition-colors">
-            <h2 className="text-xl font-semibold mb-4 text-gray-900">Upload Resume</h2>
-            <input
-              type="file"
-              onChange={(e) => handleFileChange(e, 'resume')}
-              accept={allowedFileTypes.resume.join(',')}
-              className="mb-4 block w-full text-sm text-gray-500
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-full file:border-0
-                file:text-sm file:font-semibold
-                file:bg-blue-50 file:text-blue-700
-                hover:file:bg-blue-100"
-            />
-            {resumeFile && (
-              <p className="text-sm text-gray-600 flex items-center">
-                <Check className="w-4 h-4 text-green-500 mr-2" />
-                Selected: {resumeFile.name}
-              </p>
+    <div className="container mx-auto px-4 py-8">
+      <Card className="p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Upload Your Resume</h1>
+          <div className="text-sm">
+            {creditsLoading ? (
+              <span className="text-gray-500">Loading credits...</span>
+            ) : (
+              <span className={credits?.credits_remaining === 0 ? 'text-red-600' : 'text-blue-600'}>
+                {credits?.credits_remaining || 0} credit{credits?.credits_remaining !== 1 ? 's' : ''} remaining
+              </span>
             )}
-          </Card>
-
-          {/* Job Posting Upload */}
-          <Card className="p-6 border border-gray-200 hover:border-blue-200 transition-colors">
-            <h2 className="text-xl font-semibold mb-4 text-gray-900">Upload Job Posting</h2>
-            <input
-              type="file"
-              onChange={(e) => handleFileChange(e, 'jobPosting')}
-              accept={allowedFileTypes.jobPosting.join(',')}
-              className="mb-4 block w-full text-sm text-gray-500
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-full file:border-0
-                file:text-sm file:font-semibold
-                file:bg-blue-50 file:text-blue-700
-                hover:file:bg-blue-100"
-            />
-            {jobPostingFile && (
-              <p className="text-sm text-gray-600 flex items-center">
-                <Check className="w-4 h-4 text-green-500 mr-2" />
-                Selected: {jobPostingFile.name}
-              </p>
-            )}
-          </Card>
+          </div>
+        </div>
+        
+        {/* Resume Upload */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium mb-2">
+            Resume {getFileTypeMessage('resume')}
+          </label>
+          <input
+            type="file"
+            accept={allowedFileTypes.join(',')}
+            onChange={handleResumeUpload}
+            className="block w-full text-sm text-gray-500
+              file:mr-4 file:py-2 file:px-4
+              file:rounded-full file:border-0
+              file:text-sm file:font-semibold
+              file:bg-blue-50 file:text-blue-700
+              hover:file:bg-blue-100"
+          />
+          {resumeFile && (
+            <div className="mt-2 text-sm text-green-600 flex items-center">
+              <Check className="w-4 h-4 mr-1" />
+              {resumeFile.name}
+            </div>
+          )}
         </div>
 
-        {/* Error Display */}
+        {/* Job Posting Upload */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium mb-2">
+            Job Posting {getFileTypeMessage('jobPosting')}
+          </label>
+          <input
+            type="file"
+            accept={allowedFileTypes.join(',')}
+            onChange={handleJobPostingUpload}
+            className="block w-full text-sm text-gray-500
+              file:mr-4 file:py-2 file:px-4
+              file:rounded-full file:border-0
+              file:text-sm file:font-semibold
+              file:bg-blue-50 file:text-blue-700
+              hover:file:bg-blue-100"
+          />
+          {jobPostingFile && (
+            <div className="mt-2 text-sm text-green-600 flex items-center">
+              <Check className="w-4 h-4 mr-1" />
+              {jobPostingFile.name}
+            </div>
+          )}
+        </div>
+
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg relative mb-4 max-w-2xl mx-auto">
+          <div className="mb-6 p-3 bg-red-50 text-red-600 rounded-lg">
             {error}
           </div>
         )}
 
-        {/* Loading State */}
-        {isLoading && (
-          <div className="text-center mb-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-2 text-gray-600">Processing your files...</p>
-          </div>
-        )}
-
         {/* Optimize Button */}
-        {resumeFile && jobPostingFile && !showResults && (
-          <div className="text-center mb-12">
-            <Button
-              onClick={handleOptimizeClick}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg rounded-full shadow-lg hover:shadow-xl transition-all"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Optimizing...' : 'Optimize Resume'}
-            </Button>
-          </div>
-        )}
+        <div className="flex justify-between items-center">
+          <Button
+            onClick={handleOptimizeClick}
+            disabled={!resumeFile || !jobPostingFile || isLoading || credits?.credits_remaining === 0}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-8 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? 'Optimizing...' : 'Optimize Resume'}
+          </Button>
 
-        {/* Results Section */}
-        {showResults && optimizedContent && (
-          <Card className="p-8 max-w-4xl mx-auto border border-gray-200 mb-12">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-900">Your Optimized Resume</h2>
-            <div className="mb-6">
-              <p className="whitespace-pre-wrap text-gray-600 p-6 bg-gray-50 rounded-lg border border-gray-100">
-                {optimizedContent}
-              </p>
-            </div>
-            <div className="text-center">
+          {credits?.credits_remaining === 0 && (
+            <Button
+              onClick={() => navigate('/pricing')}
+              className="bg-green-600 hover:bg-green-700 text-white px-8"
+            >
+              Get More Credits
+            </Button>
+          )}
+        </div>
+
+        {/* Preview Section */}
+        {previewUrl && (
+          <div className="mt-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Preview</h2>
               <Button
                 onClick={handleDownloadClick}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-full shadow-lg hover:shadow-xl transition-all"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
               >
-                Download Optimized Resume
+                Download
               </Button>
             </div>
-          </Card>
-        )}
-
-        {/* Features Section */}
-        <div className="mt-20 bg-blue-50 rounded-xl p-8">
-          <h2 className="text-2xl font-bold text-center mb-12 text-gray-900">How It Works</h2>
-          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            <div className="text-center">
-              <div className="bg-blue-600 text-white w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-              </div>
-              <h3 className="font-semibold mb-2">1. Upload Files</h3>
-              <p className="text-gray-600">Upload your resume and job posting (accepts PDF, Word, Text, and Image files)</p>
-            </div>
-            <div className="text-center">
-              <div className="bg-blue-600 text-white w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <h3 className="font-semibold mb-2">2. AI Analysis</h3>
-              <p className="text-gray-600">Our AI analyzes and matches your qualifications to the job requirements</p>
-            </div>
-            <div className="text-center">
-              <div className="bg-blue-600 text-white w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-              </div>
-              <h3 className="font-semibold mb-2">3. Get Results</h3>
-              <p className="text-gray-600">Download your optimized resume ready for submission</p>
-            </div>
+            <ResumePreview previewUrl={previewUrl} isLoading={isPreviewLoading} />
           </div>
-        </div>
-      </div>
+        )}
+      </Card>
     </div>
   );
 }

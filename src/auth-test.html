@@ -50,29 +50,36 @@
             text-align: center;
         }
 
-        button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: var(--radius);
-            font-size: 0.875rem;
-            font-weight: 500;
-            height: 2.5rem;
-            padding: 0 1rem;
+        .button {
             background-color: var(--primary);
             color: var(--primary-foreground);
             border: none;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius);
             cursor: pointer;
-            transition: background-color 0.2s;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: opacity 0.2s;
+            width: 100%;
+            margin-top: 0.5rem;
         }
 
-        button:hover {
-            background-color: hsl(222.2, 47.4%, 20%);
+        .button:hover {
+            opacity: 0.9;
         }
 
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .forgot-password {
+            display: block;
+            text-align: right;
+            color: var(--primary);
+            font-size: 0.875rem;
+            text-decoration: none;
+            margin-top: 0.5rem;
+            cursor: pointer;
+        }
+
+        .forgot-password:hover {
+            text-decoration: underline;
         }
 
         input {
@@ -153,6 +160,27 @@
         .button-group button {
             flex: 1;
         }
+        
+        .user-info-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            background: var(--secondary);
+            border-radius: var(--radius);
+            margin: 0;
+        }
+        
+        .user-info-label {
+            font-weight: 500;
+            width: 140px;
+            color: var(--secondary-foreground);
+            margin-right: 1rem;
+        }
+        
+        .user-info-value {
+            color: var(--foreground);
+            flex: 1;
+        }
     </style>
 </head>
 <body>
@@ -174,6 +202,7 @@
                 <input type="email" id="login-email" placeholder="Email">
                 <input type="password" id="login-password" placeholder="Password">
                 <button class="button" onclick="login()">Login</button>
+                <a class="forgot-password" onclick="forgotPassword()">Forgot Password?</a>
             </div>
         </div>
 
@@ -189,19 +218,15 @@
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
         
-        let supabase;
+        // Initialize Supabase client directly with credentials
+        const supabase = createClient(
+            'https://flayyfibpsxcobykocsw.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZsYXl5ZmlicHN4Y29ieWtvY3N3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzAzOTgxOTUsImV4cCI6MjA0NTk3NDE5NX0.9Y9BvjdjXDvcQbBweiGMeJtTurtO9T1mNgKcScr3IaU'
+        );
 
-        async function initializeSupabase() {
+        // Check for existing session on page load
+        async function checkSession() {
             try {
-                const response = await fetch('/api/config');
-                const config = await response.json();
-                
-                supabase = createClient(config.VITE_SUPABASE_URL, config.VITE_SUPABASE_ANON_KEY);
-                
-                document.getElementById('config-status').className = 'status success';
-                document.getElementById('config-status').textContent = 'Configuration loaded successfully';
-                
-                // Check for existing session
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
                 if (session) {
                     document.getElementById('session-status').className = 'status success';
@@ -212,62 +237,206 @@
                     document.getElementById('session-status').textContent = 'Not logged in';
                 }
             } catch (error) {
-                document.getElementById('config-status').className = 'status error';
-                document.getElementById('config-status').textContent = 'Error loading configuration: ' + error.message;
+                console.error('Session check error:', error);
+                document.getElementById('session-status').className = 'status error';
+                document.getElementById('session-status').textContent = 'Error checking session: ' + error.message;
             }
         }
 
-        window.signUp = async function() {
-            const email = document.getElementById('signup-email').value;
+        // Call checkSession when the page loads
+        checkSession();
+
+        // Validate email format
+        function isValidEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+
+        // Validate password strength
+        function isValidPassword(password) {
+            return password && password.length >= 6;
+        }
+
+        // Make functions available globally
+        globalThis.signUp = async function() {
+            const email = document.getElementById('signup-email').value.trim();
             const password = document.getElementById('signup-password').value;
             
+            // Input validation
+            if (!email || !password) {
+                document.getElementById('session-status').className = 'status error';
+                document.getElementById('session-status').textContent = 'Error: Email and password are required';
+                return;
+            }
+
+            if (!isValidEmail(email)) {
+                document.getElementById('session-status').className = 'status error';
+                document.getElementById('session-status').textContent = 'Error: Please enter a valid email address';
+                return;
+            }
+
+            if (!isValidPassword(password)) {
+                document.getElementById('session-status').className = 'status error';
+                document.getElementById('session-status').textContent = 'Error: Password must be at least 6 characters long';
+                return;
+            }
+            
             try {
+                document.getElementById('session-status').className = 'status';
+                document.getElementById('session-status').textContent = 'Signing up...';
+
                 const { data, error } = await supabase.auth.signUp({
                     email,
                     password,
+                    options: {
+                        emailRedirectTo: 'http://localhost:3002/auth-confirmation.html'
+                    }
                 });
                 
-                if (error) throw error;
+                if (error) {
+                    console.error('Signup error:', error);
+                    throw error;
+                }
                 
+                console.log('Signup response:', data); // Log the full response
+
                 document.getElementById('session-status').className = 'status success';
-                document.getElementById('session-status').textContent = 'Signup successful! Please check your email to confirm your account.';
+                let statusMessage = 'Signup successful!';
+                
+                if (data.user && data.user.confirmation_sent_at) {
+                    statusMessage += ` Confirmation email sent at ${new Date(data.user.confirmation_sent_at).toLocaleTimeString()}`;
+                }
+                
+                if (data.user && data.user.id) {
+                    statusMessage += `\nUser ID: ${data.user.id}`;
+                }
+
+                document.getElementById('session-status').textContent = statusMessage;
+                
                 if (data.user) {
                     showUserInfo(data.user);
                 }
+
+                // Add a resend button
+                const resendButton = document.createElement('button');
+                resendButton.className = 'button';
+                resendButton.style.marginTop = '10px';
+                resendButton.textContent = 'Resend Confirmation Email';
+                resendButton.onclick = async () => {
+                    try {
+                        const { error: resendError } = await supabase.auth.resend({
+                            type: 'signup',
+                            email: email
+                        });
+                        
+                        if (resendError) throw resendError;
+                        
+                        document.getElementById('session-status').textContent = 'Confirmation email resent! Please check your inbox.';
+                    } catch (resendError) {
+                        console.error('Resend error:', resendError);
+                        document.getElementById('session-status').className = 'status error';
+                        document.getElementById('session-status').textContent = 'Error resending email: ' + resendError.message;
+                    }
+                };
+                
+                document.getElementById('session-status').appendChild(document.createElement('br'));
+                document.getElementById('session-status').appendChild(resendButton);
+                
             } catch (error) {
+                console.error('Detailed signup error:', error);
                 document.getElementById('session-status').className = 'status error';
-                document.getElementById('session-status').textContent = 'Error signing up: ' + error.message;
+                document.getElementById('session-status').textContent = 'Error signing up: ' + (error.message || 'Unknown error occurred');
             }
         }
 
-        window.login = async function() {
-            const email = document.getElementById('login-email').value;
+        globalThis.login = async function() {
+            const email = document.getElementById('login-email').value.trim();
             const password = document.getElementById('login-password').value;
             
+            // Input validation
+            if (!email || !password) {
+                document.getElementById('session-status').className = 'status error';
+                document.getElementById('session-status').textContent = 'Error: Email and password are required';
+                return;
+            }
+
+            if (!isValidEmail(email)) {
+                document.getElementById('session-status').className = 'status error';
+                document.getElementById('session-status').textContent = 'Error: Please enter a valid email address';
+                return;
+            }
+            
             try {
+                document.getElementById('session-status').className = 'status';
+                document.getElementById('session-status').textContent = 'Logging in...';
+
                 const { data, error } = await supabase.auth.signInWithPassword({
                     email,
                     password,
                 });
                 
-                if (error) throw error;
+                if (error) {
+                    console.error('Login error:', error);
+                    throw error;
+                }
                 
                 document.getElementById('session-status').className = 'status success';
-                document.getElementById('session-status').textContent = 'Login successful!';
+                document.getElementById('session-status').textContent = 'Logged in successfully!';
                 if (data.user) {
                     showUserInfo(data.user);
+                    // Redirect to dashboard after successful login
+                    window.location.href = '/dashboard.html';
                 }
             } catch (error) {
+                console.error('Detailed login error:', error);
                 document.getElementById('session-status').className = 'status error';
-                document.getElementById('session-status').textContent = 'Error logging in: ' + error.message;
+                document.getElementById('session-status').textContent = 'Error logging in: ' + (error.message || 'Unknown error occurred');
             }
         }
 
-        window.getCurrentUser = async function() {
+        globalThis.forgotPassword = async function() {
+            const email = document.getElementById('login-email').value.trim();
+            
+            if (!email) {
+                document.getElementById('session-status').className = 'status error';
+                document.getElementById('session-status').textContent = 'Please enter your email address';
+                return;
+            }
+
+            if (!isValidEmail(email)) {
+                document.getElementById('session-status').className = 'status error';
+                document.getElementById('session-status').textContent = 'Please enter a valid email address';
+                return;
+            }
+
+            try {
+                document.getElementById('session-status').className = 'status';
+                document.getElementById('session-status').textContent = 'Sending password reset email...';
+
+                const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+                    redirectTo: window.location.origin + '/auth-confirmation.html',
+                });
+
+                if (error) throw error;
+
+                document.getElementById('session-status').className = 'status success';
+                document.getElementById('session-status').textContent = 'Password reset email sent! Please check your inbox.';
+
+            } catch (error) {
+                console.error('Password reset error:', error);
+                document.getElementById('session-status').className = 'status error';
+                document.getElementById('session-status').textContent = 'Error sending reset email: ' + error.message;
+            }
+        }
+
+        globalThis.getCurrentUser = async function() {
             try {
                 const { data: { user }, error } = await supabase.auth.getUser();
                 
-                if (error) throw error;
+                if (error) {
+                    console.error('Get user error:', error);
+                    throw error;
+                }
                 
                 if (user) {
                     showUserInfo(user);
@@ -275,22 +444,29 @@
                     document.getElementById('user-info').textContent = 'No user currently logged in';
                 }
             } catch (error) {
-                document.getElementById('user-info').textContent = 'Error getting user: ' + error.message;
+                console.error('Detailed get user error:', error);
+                document.getElementById('user-info').textContent = 'Error getting user: ' + (error.message || 'Unknown error occurred');
             }
         }
 
-        window.signOut = async function() {
+        globalThis.signOut = async function() {
             try {
-                const { error } = await supabase.auth.signOut();
-                
-                if (error) throw error;
-                
                 document.getElementById('session-status').className = 'status';
+                document.getElementById('session-status').textContent = 'Signing out...';
+
+                const { error } = await supabase.auth.signOut();
+                if (error) {
+                    console.error('Sign out error:', error);
+                    throw error;
+                }
+                
+                document.getElementById('session-status').className = 'status success';
                 document.getElementById('session-status').textContent = 'Signed out successfully';
                 document.getElementById('user-info').textContent = '';
             } catch (error) {
+                console.error('Detailed sign out error:', error);
                 document.getElementById('session-status').className = 'status error';
-                document.getElementById('session-status').textContent = 'Error signing out: ' + error.message;
+                document.getElementById('session-status').textContent = 'Error signing out: ' + (error.message || 'Unknown error occurred');
             }
         }
 
@@ -299,29 +475,29 @@
                 'Email': user.email,
                 'Email Confirmed': user.email_confirmed_at ? 'Yes' : 'No',
                 'Account Created': new Date(user.created_at).toLocaleDateString(),
-                'Last Sign In': new Date(user.last_sign_in_at).toLocaleDateString()
+                'Last Sign In': user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleDateString() : 'Never'
             };
 
-            const infoHtml = Object.entries(userInfo)
-                .map(([key, value]) => 
-                    `<div class="info-row">
-                        <div class="info-label">${key}:</div>
-                        <div class="info-value">${value}</div>
-                    </div>`
-                ).join('');
+            const userInfoDiv = document.getElementById('user-info');
+            userInfoDiv.innerHTML = '';
 
-            document.getElementById('user-info').innerHTML = `
-                <div class="user-info-card">
-                    <h3>User Information</h3>
-                    <div class="info-container">
-                        ${infoHtml}
-                    </div>
-                </div>
-            `;
+            Object.entries(userInfo).forEach(([label, value]) => {
+                const item = document.createElement('div');
+                item.className = 'user-info-item';
+                
+                const labelSpan = document.createElement('span');
+                labelSpan.className = 'user-info-label';
+                labelSpan.textContent = label + ':';
+                
+                const valueSpan = document.createElement('span');
+                valueSpan.className = 'user-info-value';
+                valueSpan.textContent = value;
+                
+                item.appendChild(labelSpan);
+                item.appendChild(valueSpan);
+                userInfoDiv.appendChild(item);
+            });
         }
-
-        // Initialize when the page loads
-        initializeSupabase();
     </script>
 </body>
 </html>

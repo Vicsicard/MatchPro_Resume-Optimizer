@@ -9,6 +9,7 @@
             margin: 20px auto;
             padding: 20px;
             text-align: center;
+            background-color: #f0f2f5;
         }
         .card {
             background: white;
@@ -22,27 +23,55 @@
             font-size: 24px;
             margin: 20px 0;
         }
+        .error {
+            color: #dc3545;
+            font-size: 18px;
+            margin: 20px 0;
+        }
         .button {
-            background: #007bff;
+            background: #1a73e8;
             color: white;
             padding: 10px 20px;
             border-radius: 4px;
             text-decoration: none;
             display: inline-block;
             margin-top: 20px;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background: #1557b0;
         }
         #status {
             margin: 20px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #1a73e8;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
     <div class="card">
         <h1>Email Confirmation</h1>
-        <div id="status">Processing your confirmation...</div>
+        <div id="status">
+            <div class="loading"></div>
+            Processing your confirmation...
+        </div>
         <div id="next-steps" style="display: none;">
             <p class="success">✓ Email confirmed successfully!</p>
-            <p>Your account has been verified.</p>
+            <p>Your account has been verified. You can now log in to your account.</p>
             <a href="/auth-test.html" class="button">Continue to Login</a>
         </div>
     </div>
@@ -50,28 +79,16 @@
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 
-        async function getConfig() {
-            try {
-                const response = await fetch('/api/config');
-                const config = await response.json();
-                return {
-                    supabaseUrl: config.VITE_SUPABASE_URL,
-                    supabaseKey: config.VITE_SUPABASE_ANON_KEY
-                };
-            } catch (error) {
-                console.error('Error fetching config:', error);
-                document.getElementById('status').innerHTML = 'Error loading configuration. Please try again.';
-                return null;
-            }
-        }
+        // Initialize Supabase client with hardcoded credentials
+        const supabase = createClient(
+            'https://flayyfibpsxcobykocsw.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZsYXl5ZmlicHN4Y29ieWtvY3N3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzAzOTgxOTUsImV4cCI6MjA0NTk3NDE5NX0.9Y9BvjdjXDvcQbBweiGMeJtTurtO9T1mNgKcScr3IaU'
+        );
 
         async function handleConfirmation() {
+            const statusElement = document.getElementById('status');
+            
             try {
-                const config = await getConfig();
-                if (!config) return;
-
-                const supabase = createClient(config.supabaseUrl, config.supabaseKey);
-                
                 // Get the hash from the URL
                 const hash = window.location.hash.substring(1);
                 const params = new URLSearchParams(hash);
@@ -81,35 +98,52 @@
                 const refreshToken = params.get('refresh_token');
                 const type = params.get('type');
 
+                if (!hash) {
+                    throw new Error('No confirmation token found in URL. Please check your confirmation email and click the link again.');
+                }
+
                 if (type === 'recovery') {
-                    document.getElementById('status').innerHTML = 'Please reset your password:';
-                    // Add password reset form here if needed
+                    statusElement.innerHTML = `
+                        <p>Please reset your password:</p>
+                        <form id="reset-form">
+                            <input type="password" id="new-password" placeholder="New Password" required>
+                            <button type="submit" class="button">Reset Password</button>
+                        </form>
+                    `;
                     return;
                 }
 
-                if (accessToken) {
-                    const { error } = await supabase.auth.setSession({
-                        access_token: accessToken,
-                        refresh_token: refreshToken,
-                    });
-
-                    if (error) {
-                        throw error;
-                    }
-
-                    // Show success message and next steps
-                    document.getElementById('status').style.display = 'none';
-                    document.getElementById('next-steps').style.display = 'block';
-                } else {
-                    document.getElementById('status').innerHTML = 'No confirmation token found. Please check your confirmation link.';
+                if (!accessToken) {
+                    throw new Error('Invalid confirmation link. Please check your email and try again.');
                 }
+
+                // Set the user session with the tokens
+                const { error } = await supabase.auth.setSession({
+                    access_token: accessToken,
+                    refresh_token: refreshToken,
+                });
+
+                if (error) throw error;
+
+                // Show success message and next steps
+                statusElement.style.display = 'none';
+                document.getElementById('next-steps').style.display = 'block';
+
+                // Log success
+                console.log('Email confirmed successfully');
+                
             } catch (error) {
-                console.error('Error:', error);
-                document.getElementById('status').innerHTML = `Error: ${error.message}`;
+                console.error('Confirmation error:', error);
+                statusElement.className = 'error';
+                statusElement.innerHTML = `
+                    <p>Error confirming email: ${error.message}</p>
+                    <p>Please try clicking the confirmation link in your email again.</p>
+                    <a href="/auth-test.html" class="button">Back to Login</a>
+                `;
             }
         }
 
-        // Run the confirmation handler when the page loads
+        // Handle confirmation when the page loads
         handleConfirmation();
     </script>
 </body>

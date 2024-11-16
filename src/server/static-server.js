@@ -6,14 +6,23 @@ import dotenv from 'dotenv';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables
-const envPath = path.resolve(__dirname, '../.env.local');
-console.log('Loading environment from:', envPath);
-dotenv.config({ path: envPath });
+// Load environment variables from both .env and .env.local
+const envLocalPath = path.resolve(__dirname, '../.env.local');
+const envPath = path.resolve(__dirname, '../.env');
+
+// Try loading .env.local first, then fall back to .env
+if (dotenv.config({ path: envLocalPath }).error) {
+    console.log('No .env.local found, trying .env');
+    dotenv.config({ path: envPath });
+}
 
 // Debug: Check if variables are loaded
-console.log('Supabase URL:', process.env.VITE_SUPABASE_URL);
-console.log('Supabase Key length:', process.env.VITE_SUPABASE_ANON_KEY ? process.env.VITE_SUPABASE_ANON_KEY.length : 'not found');
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+console.log('Environment variables loaded from:', envLocalPath);
+console.log('Supabase URL:', supabaseUrl ? 'Found' : 'Not found');
+console.log('Supabase Key:', supabaseKey ? 'Found (length: ' + supabaseKey.length + ')' : 'Not found');
 
 const app = express();
 const PORT = 3002; // Changed to 3002 since 3000 and 3001 are in use

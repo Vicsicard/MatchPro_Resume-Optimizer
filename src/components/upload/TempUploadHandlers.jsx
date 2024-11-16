@@ -1,4 +1,77 @@
-// Handle preview and download of optimized resume
+// Define allowed file types and their messages
+export const allowedFileTypes = ['.pdf', '.doc', '.docx', '.txt'];
+
+export const getFileTypeMessage = (fileType) => {
+  switch (fileType) {
+    case 'resume':
+      return `Accepted formats: ${allowedFileTypes.join(', ')}`;
+    case 'jobPosting':
+      return 'Paste job description or upload file';
+    default:
+      return '';
+  }
+};
+
+// Handle file upload and validation
+export const handleFileUpload = async (file, type, setStates) => {
+  const { setError, setFile } = setStates;
+  
+  try {
+    if (!file) {
+      throw new Error('No file selected');
+    }
+
+    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+    if (!allowedFileTypes.includes(fileExtension)) {
+      throw new Error(`Invalid file type. Allowed types: ${allowedFileTypes.join(', ')}`);
+    }
+
+    setFile(file);
+    return true;
+  } catch (err) {
+    console.error(`Error uploading ${type}:`, err);
+    setError(err.message);
+    return false;
+  }
+};
+
+// Handle optimization process
+export const handleOptimization = async (resumeFile, jobPostingFile, setStates) => {
+  const { setError, setIsOptimizing, setOptimizedContent } = setStates;
+  
+  try {
+    setIsOptimizing(true);
+    
+    // Call your backend optimization endpoint
+    const formData = new FormData();
+    formData.append('resume', resumeFile);
+    if (jobPostingFile) {
+      formData.append('jobPosting', jobPostingFile);
+    }
+    
+    const response = await fetch('/api/optimize-resume', {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to optimize resume');
+    }
+    
+    const data = await response.json();
+    setOptimizedContent(data.optimizedContent);
+    return data.optimizedContent;
+    
+  } catch (err) {
+    console.error('Error during optimization:', err);
+    setError('Failed to optimize resume');
+    return null;
+  } finally {
+    setIsOptimizing(false);
+  }
+};
+
+// Handle preview generation
 export const handlePreviewAndDownload = async (optimizedContent, setStates) => {
   const { setError, setPreviewUrl, setIsPreviewLoading } = setStates;
   
@@ -28,7 +101,7 @@ export const handlePreviewAndDownload = async (optimizedContent, setStates) => {
   }
 };
 
-// Handle the actual download after preview
+// Handle the actual download
 export const handleDownload = async (previewData, setError) => {
   try {
     if (!previewData || !previewData.blob) {
@@ -45,19 +118,26 @@ export const handleDownload = async (previewData, setError) => {
     URL.revokeObjectURL(url);
     document.body.removeChild(a);
     
-    // Store in Supabase for history
-    const file = new File([previewData.blob], `optimized_resume.${previewData.format}`, { 
-      type: previewData.format === 'pdf' ? 'application/pdf' : 'text/plain' 
-    });
-    await storeFile(file, 'optimized-resumes');
-    
   } catch (err) {
     console.error('Error downloading file:', err);
     setError('Failed to download optimized resume');
   }
 };
 
-// Preview component for the resume
+// Format resume content with proper sections
+const formatResumeContent = (content) => {
+  // Add proper formatting logic here
+  return content;
+};
+
+// Convert content to PDF format
+const formatAsPdf = async (content) => {
+  // Add PDF conversion logic here
+  // For now, return a simple blob
+  return new Blob([content], { type: 'application/pdf' });
+};
+
+// Preview component
 export const ResumePreview = ({ previewUrl, isLoading }) => {
   if (isLoading) {
     return (
@@ -90,7 +170,7 @@ export const ResumePreview = ({ previewUrl, isLoading }) => {
 };
 
 // Add styles for the preview component
-const previewStyles = `
+const styles = `
 .resume-preview {
   margin: 20px 0;
   padding: 20px;
@@ -125,7 +205,9 @@ const previewStyles = `
 `;
 
 // Inject styles into document head
-const styleSheet = document.createElement('style');
-styleSheet.type = 'text/css';
-styleSheet.innerText = previewStyles;
-document.head.appendChild(styleSheet);
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.type = 'text/css';
+  styleSheet.innerText = styles;
+  document.head.appendChild(styleSheet);
+}

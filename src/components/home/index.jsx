@@ -1,10 +1,44 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Check } from 'lucide-react';
 
 const Home = () => {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    console.log('Home component mounted');
+    return () => console.log('Home component unmounted');
+  }, []);
+
+  const handleGetStarted = () => {
+    try {
+      console.log('Navigating to /free-signup');
+      navigate('/free-signup');
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
+  };
+
+  const handlePricingClick = () => {
+    try {
+      console.log('Navigating to /pricing');
+      navigate('/pricing');
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
+  };
+
+  const handleLogin = () => {
+    try {
+      console.log('Navigating to /auth');
+      navigate('/auth');
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
+  };
+
+  console.log('Home component rendering');
 
   return (
     <div className="min-h-screen bg-white">
@@ -27,17 +61,22 @@ const Home = () => {
         </p>
         <div className="flex justify-center gap-4 mb-8">
           <Button 
-            onClick={() => navigate('/upload')}
+            onClick={handleGetStarted}
             className="bg-blue-600 hover:bg-blue-700 text-white px-8"
           >
             Get Started Free
           </Button>
           <Button 
-            onClick={() => navigate('/pricing')}
-            variant="outline"
-            className="border-gray-300 hover:bg-gray-50"
+            onClick={handlePricingClick}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-8"
           >
             Premium Upgrade
+          </Button>
+          <Button
+            onClick={handleLogin}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+          >
+            Login
           </Button>
         </div>
         <div className="flex justify-center gap-8 text-sm text-gray-600">
@@ -126,7 +165,7 @@ const Home = () => {
             Join thousands of successful job seekers who have improved their chances with MatchPro Resume.
           </p>
           <Button 
-            onClick={() => navigate('/upload')}
+            onClick={handleGetStarted}
             className="bg-black text-white hover:bg-white hover:text-black transition-colors duration-200 px-8"
           >
             Upload Your Resume →

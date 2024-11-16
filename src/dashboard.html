@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MatchPro Resume Dashboard</title>
+    <style>
+        :root {
+            --primary: #2563eb; /* blue-600 */
+            --primary-hover: #1d4ed8; /* blue-700 */
+            --secondary: #f8fafc; /* slate-50 */
+            --secondary-foreground: #475569; /* slate-600 */
+            --background: #ffffff;
+            --foreground: #0f172a; /* slate-900 */
+            --border: #e2e8f0; /* slate-200 */
+            --radius: 0.5rem;
+            --success: #22c55e; /* green-500 */
+            --warning: #ef4444; /* red-500 */
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--background);
+            color: var(--foreground);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .card {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 1rem;
+            font-weight: 500;
+            border-radius: var(--radius);
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .button.secondary {
+            background-color: var(--background);
+            color: var(--foreground);
+            border: 1px solid var(--border);
+        }
+
+        .button.secondary:hover {
+            background-color: var(--secondary);
+        }
+
+        .dashboard-main {
+            margin-top: 2rem;
+        }
+
+        .dashboard-main h2 {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 1.5rem;
+            color: var(--foreground);
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .dashboard-card {
+            background: var(--background);
+            padding: 1.5rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            transition: all 0.2s;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .dashboard-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        .dashboard-card h3 {
+            color: var(--foreground);
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0 0 1rem 0;
+        }
+
+        .stat {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            line-height: 1;
+        }
+
+        .credits-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            padding: 0.5rem;
+            border-radius: var(--radius);
+            background: var(--secondary);
+            font-size: 0.875rem;
+            color: var(--secondary-foreground);
+        }
+
+        .low-credits {
+            color: var(--warning);
+        }
+
+        .good-credits {
+            color: var(--success);
+        }
+
+        .resume-list {
+            margin-top: 1rem;
+        }
+
+        .resume-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            background: var(--secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 0.5rem;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .resume-item:hover {
+            border-color: var(--primary);
+        }
+
+        .resume-item span {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+            min-width: 0;
+            color: var(--foreground);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 200px;
+            font-size: 1.125rem;
+            color: var(--secondary-foreground);
+        }
+
+        /* Announcement Banner (like home page) */
+        .announcement {
+            background-color: #eff6ff; /* blue-50 */
+            padding: 0.5rem 1rem;
+            text-align: center;
+            color: var(--primary);
+            font-size: 0.875rem;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .card {
+                padding: 1rem;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="announcement">
+        Welcome to your personalized dashboard! Start optimizing your resume today →
+    </div>
+    <div class="card">
+        <div id="loading" class="loading">Loading...</div>
+        
+        <div id="dashboard-content" class="dashboard-content">
+            <div class="header">
+                <h1>MatchPro Resume Dashboard</h1>
+                <div class="user-info">
+                    <div id="user-email"></div>
+                    <button class="button" onclick="handleSignOut()">Sign Out</button>
+                </div>
+            </div>
+
+            <div class="dashboard-main">
+                <h2>Welcome to your Dashboard</h2>
+                
+                <div class="dashboard-grid">
+                    <!-- Credits Card -->
+                    <div class="dashboard-card">
+                        <h3>Account Credits</h3>
+                        <div class="stat" id="credits-count">15</div>
+                        <div>Remaining Credits</div>
+                        <div class="credits-info" id="credits-info">
+                            <i>ℹ️</i>
+                            <span>Each resume optimization uses 1 credit</span>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="button" onclick="purchaseCredits()">Purchase Credits</button>
+                            <button class="button secondary" onclick="viewCreditHistory()">View History</button>
+                        </div>
+                    </div>
+
+                    <!-- Resume Management -->
+                    <div class="dashboard-card">
+                        <h3>Resume Management</h3>
+                        <div class="stat">2</div>
+                        <div>Active Resumes</div>
+                        <div class="resume-list">
+                            <div class="resume-item">
+                                <span>Software_Dev_Resume.pdf</span>
+                                <div class="action-buttons">
+                                    <button class="button secondary" onclick="optimizeResume('resume1')">Optimize</button>
+                                    <button class="button secondary" onclick="viewHistory('resume1')">History</button>
+                                </div>
+                            </div>
+                            <div class="resume-item">
+                                <span>Project_Manager_Resume.pdf</span>
+                                <div class="action-buttons">
+                                    <button class="button secondary" onclick="optimizeResume('resume2')">Optimize</button>
+                                    <button class="button secondary" onclick="viewHistory('resume2')">History</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="button" onclick="uploadResume()">Upload New Resume</button>
+                        </div>
+                    </div>
+
+                    <!-- Job Applications -->
+                    <div class="dashboard-card">
+                        <h3>Job Applications</h3>
+                        <div class="stat">5</div>
+                        <div>Active Applications</div>
+                        <div class="action-buttons">
+                            <button class="button" onclick="trackNewApplication()">Track New Application</button>
+                            <button class="button secondary" onclick="viewAllApplications()">View All</button>
+                        </div>
+                    </div>
+
+                    <!-- Resume Analytics -->
+                    <div class="dashboard-card">
+                        <h3>Resume Analytics</h3>
+                        <div class="stat">85%</div>
+                        <div>Average Match Score</div>
+                        <div class="action-buttons">
+                            <button class="button" onclick="analyzeResume()">Analyze Resume</button>
+                            <button class="button secondary" onclick="viewDetailedAnalytics()">View Details</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { requireAuth, signOut } from './auth-utils.js';
+
+        // Make signOut available globally
+        window.handleSignOut = signOut;
+
+        // Check authentication on page load
+        async function init() {
+            const user = await requireAuth();
+            
+            if (user) {
+                // Show dashboard content
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('dashboard-content').style.display = 'block';
+                
+                // Display user email
+                document.getElementById('user-email').textContent = user.email;
+            }
+        }
+
+        // Initialize the page
+        init();
+
+        // Dashboard action functions
+        window.uploadResume = () => {
+            alert('Upload Resume feature coming soon!');
+        };
+
+        window.optimizeResume = (resumeId) => {
+            alert('Resume Optimization feature coming soon!');
+        };
+
+        window.viewHistory = (resumeId) => {
+            alert('Resume History feature coming soon!');
+        };
+
+        window.trackNewApplication = () => {
+            alert('Job Application Tracking feature coming soon!');
+        };
+
+        window.viewAllApplications = () => {
+            alert('View All Applications feature coming soon!');
+        };
+
+        window.analyzeResume = () => {
+            alert('Resume Analysis feature coming soon!');
+        };
+
+        window.viewDetailedAnalytics = () => {
+            alert('Detailed Analytics feature coming soon!');
+        };
+
+        // Credits functions
+        window.purchaseCredits = () => {
+            window.location.href = '/pricing';
+        };
+
+        window.viewCreditHistory = () => {
+            alert('Credit History feature coming soon!');
+        };
+
+        // Update credits display based on count
+        function updateCreditsDisplay(credits) {
+            const creditsElement = document.getElementById('credits-count');
+            const creditsInfo = document.getElementById('credits-info');
+            
+            creditsElement.textContent = credits;
+            
+            if (credits < 5) {
+                creditsElement.classList.add('low-credits');
+                creditsInfo.innerHTML = `
+                    <i>⚠️</i>
+                    <span>Low credits! Consider purchasing more</span>
+                `;
+            } else {
+                creditsElement.classList.add('good-credits');
+            }
+        }
+
+        // Initialize with current credits
+        updateCreditsDisplay(15);
+    </script>
+</body>
+</html>
