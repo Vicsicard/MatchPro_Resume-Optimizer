@@ -996,3 +996,583 @@ Having short lived user sessions can be problematic for email sending, as it for
 If you are using a SSR framework on the frontend and are seeing an increased number of user logins without a clear cause, check your set up. Make sure to keep the @supabase/ssr package up to date and closely follow the guides we publish. Make sure that the middleware components of your SSR frontend works as intended and matches the guides we've published. Sometimes a misplaced return or conditional can cause early session terminatio
 
 Please place your instruction files in this directory for reference.
+Stripe Checkout Session API doc
+Manage payment methods in the Dashboard by default
+Upgrade your API to manage payment methods in the Dashboard by default.
+On August 16, 2023, Stripe updated the selection process for default payment methods that apply to PaymentIntents and SetupIntents created with the /v1/payment_intents and /v1/setup_intents APIs.
+
+In prior versions of the Stripe API, if you didn’t specify a payment_method_types parameter during the creation request, Stripe would default to using the card payment method for both PaymentIntents and SetupIntents.
+
+Moving forward, Stripe applies eligible payment methods that you manage from your Dashboard to your PaymentIntents and SetupIntents by default if you don’t specify the payment_method_types parameter in the creation request.
+
+Payment methods
+By default, Stripe enables cards and other common payment methods. You can turn individual payment methods on or off in the Stripe Dashboard. In Checkout, Stripe evaluates the currency and any restrictions, then dynamically presents the supported payment methods to the customer.
+
+To see how your payment methods appear to customers, enter a transaction ID or set an order amount and currency in the Dashboard.
+
+You can enable Apple Pay and Google Pay in your payment methods settings. By default, Apple Pay is enabled and Google Pay is disabled. However, in some cases Stripe filters them out even when they’re enabled. We filter ApplePay if you set setup_future_usage (either top-level or in payment_method_options for card), and we filter Google Pay if you enable automatic tax without collecting a shipping address.
+
+Checkout’s Stripe-hosted pages don’t need integration changes to enable Apple Pay or Google Pay. Stripe handles these payments the same way as other card payments.
+
+Update your payment flows
+Choose from the upgrade path that matches your current Stripe integration:
+
+
+Elements
+
+Checkout and Payment Links
+
+API
+If your integration uses Card Element or individual payment method Elements, we recommend migrating to the Payment Element. This single, unified integration allows you to accept over 25 different payment methods.
+
+Create the PaymentIntent
+In this version of the API, specifying the automatic_payment_methods.enabled parameter is optional. If you don’t specify it, Stripe assumes a value of true, which enables its functionality by default.
+
+Command Line
+Select a language
+
+
+
+curl https://api.stripe.com/v1/payment_intents \
+  -u "sk_test_51OocqGGEHfPiJwM4A8f5Rjlu1LjKj0P6hbWO8oYfGnBPofsJ3jBCtnAA5GA1EFz4noXoYKFls9BDRKfhjdh8H90d00t2TCmNsc:" \
+  -d amount=1099 \
+  -d currency=usd
+Client-side confirmations with Stripe.js
+If your integration uses Stripe.js to confirm payments with confirmPayment or by payment method, your existing processes remains the same and requires no further changes.
+
+When you confirm payments, we recommend that you provide the return_url parameter. This allows you to accept payment methods that require redirect.
+
+
+HTML + JS
+
+React
+checkout.js
+
+
+const form = document.getElementById('payment-form');
+
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+
+  const {error} = await stripe.confirmPayment({
+    //`Elements` instance that was used to create the Payment Element
+    elements,
+    confirmParams: {
+      return_url: 'https://example.com/return_url',
+    },
+  });
+
+  if (error) {
+    // This point will only be reached if there is an immediate error when
+    // confirming the payment. Show error to your customer (for example, payment
+    // details incomplete)
+    const messageContainer = document.querySelector('#error-message');
+    messageContainer.textContent = error.message;
+  } else {
+    // Your customer will be redirected to your `return_url`. For some payment
+    // methods like iDEAL, your customer will be redirected to an intermediate
+    // site first to authorize the payment, then redirected to the `return_url`.
+  }
+});
+Server-side confirmation
+If you use server-side confirmation, you must use the return_url parameter in your integration.
+
+Command Line
+Select a language
+
+
+
+curl https://api.stripe.com/v1/payment_intents \
+  -u "sk_test_51OocqGGEHfPiJwM4A8f5Rjlu1LjKj0P6hbWO8oYfGnBPofsJ3jBCtnAA5GA1EFz4noXoYKFls9BDRKfhjdh8H90d00t2TCmNsc:" \
+  -d amount=1099 \
+  -d currency=usd \
+  -d confirm=true \
+  -d payment_method={{PAYMENT_METHOD_ID}} \
+  --data-urlencode return_url="https://example.com/return_url"
+Alternatively, you can create the PaymentIntent or SetupIntent with the automatic_payment_methods.allow_redirects parameter set to never. This disables the return_url requirement on confirmation. You can still manage payment methods from the Dashboard, but the payment methods that require redirects won’t be eligible.
+
+Command Line
+Select a language
+
+
+
+curl https://api.stripe.com/v1/payment_intents \
+  -u "sk_test_51OocqGGEHfPiJwM4A8f5Rjlu1LjKj0P6hbWO8oYfGnBPofsJ3jBCtnAA5GA1EFz4noXoYKFls9BDRKfhjdh8H90d00t2TCmNsc:" \
+  -d amount=1099 \
+  -d currency=usd \
+  -d confirm=true \
+  -d payment_method={{PAYMENT_METHOD_ID}} \
+  -d "automatic_payment_methods[enabled]"=true \
+  -d "automatic_payment_methods[allow_redirects]"=never
+Lastly, you can create the PaymentIntent or SetupIntent with the payment_method_types parameter. This also disables the return_url requirement on confirmation. With this option, you can’t manage payment methods from the Dashboard.
+
+Command Line
+Select a language
+
+
+
+curl https://api.stripe.com/v1/payment_intents \
+  -u "sk_test_51OocqGGEHfPiJwM4A8f5Rjlu1LjKj0P6hbWO8oYfGnBPofsJ3jBCtnAA5GA1EFz4noXoYKFls9BDRKfhjdh8H90d00t2TCmNsc:" \
+  -d amount=1099 \
+  -d currency=usd \
+  -d confirm=true \
+  -d payment_method={{PAYMENT_METHOD_ID}} \
+  -d "payment_method_types[]"=card
+  
+Stripe.js reference
+This reference documents every object and method available in Stripe’s browser-side JavaScript library, Stripe.js. Use our React Stripe.js reference if you want to add Elements to your React based app.
+
+You can use Stripe.js’ APIs to tokenize customer information, collect sensitive payment details using customizable Stripe Elements, and accept payments with browser payment APIs like Apple Pay and the Payment Request API.
+Embeddable pricing table for SaaS businesses
+Display a pricing table on your website and take customers directly to Stripe Checkout.
+You can use the Stripe Dashboard to create a table that displays different subscription pricing levels to your customers. You don’t need to write any custom code to create or embed a pricing table. This guide describes how to:
+
+Use the Stripe Dashboard to configure the UI component
+Copy the generated code from the Dashboard
+Embed the code on your website to show your customers pricing information and take them to a checkout page
+Overview
+The pricing table is an embedded UI that displays pricing information and takes customers to checkout.
+Embed a pricing table on your website to display pricing details and convert customers to checkout.
+
+A pricing table is an embeddable UI that:
+
+Displays pricing information and takes customers to a prebuilt checkout flow. The checkout flow uses Stripe Checkout to complete the purchase.
+Supports common subscription business models like flat-rate, per-seat, tiered pricing, and free trials.
+Lets you configure, customize, and update product and pricing information directly in the Dashboard, without needing to write any code.
+Embeds into your website with a <script> tag and web component. Stripe automatically generates the tag. You copy and paste it into your website’s code.
+The diagram below summarizes how the customer goes from viewing a pricing table to completing checkout.
+
+
+
+
+
+
+
+
+Pricing table
+Create pricing table
+In the Dashboard, go to More > Product catalog > pricing tables.
+Click +Create pricing table.
+Add products relevant to your customers (up to four per pricing interval). Optionally, include a free trial.
+Adjust the look and feel in Display settings. Highlight a specific product and customize the language, colors, font, and button design, then click Continue.
+Configure Payment settings to select the customer information to collect, options to present to the customer, and whether to display a confirmation page or redirect customers back to your site after a successful purchase.
+Confirm maximum quantity
+If you have tiered pricing that supports quantities greater than the default maximum of 99, check the Let customers adjust quantity property and increase the Max value accordingly. Tiered pricing options for quantities above the maximum don’t appear in the selector.
+
+Configure the customer portal by clicking Continue.
+Click Copy code to copy the generated code and embed it into your website.
+Customizing a pricing table
+Customize your pricing table
+
+Configure payment settings
+Configure payment settings
+
+Embed pricing table
+After creating a pricing table, Stripe automatically returns an embed code composed of a <script> tag and a <stripe-pricing-table> web component. Click the Copy code button to copy the code and paste it into your website.
+
+Pricing table detail page
+Copy the pricing table’s code and embed it on your website.
+
+If you’re using HTML, paste the embed code into the HTML. If you’re using React, include the script tag in your index.html page to mount the <stripe-pricing-table> component.
+
+Caution
+The pricing table uses your account’s publishable API key. If you revoke the API key, you need to update the embed code with your new publishable API key.
+
+pricing-page.html
+Select a language
+
+
+<body>
+  <h1>We offer plans that help any business!</h1>
+  <!-- Paste your embed code script here. -->
+  <script
+    async
+    src="https://js.stripe.com/v3/pricing-table.js">
+  </script>
+  <stripe-pricing-table
+    pricing-table-id='{{PRICING_TABLE_ID}}'
+    publishable-key="pk_test_51OocqGGEHfPiJwM4YLpvOAvWQBBpeFt4dsQG8wBfksxwmlKPCwUHfBJjAeYWqvhZhpoLs7JiwqjmBAM466DZjPKU00j0whzsnn"
+  >
+  </stripe-pricing-table>
+</body>
+Track subscriptions
+When a customer purchases a subscription, you’ll see it on the subscriptions page in the Dashboard.
+
+Handle fulfillment with the Stripe API
+The pricing table component uses Stripe Checkout to render a prebuilt, hosted payment page. When a payment is completed using Checkout, Stripe sends the checkout.session.completed event. Register an event destination to receive the event at your endpoint to process fulfillment and reconciliation. See the Checkout fulfillment guide for more details.
+
+The <stripe-pricing-table> web component supports setting the client-reference-id property. When the property is set, the pricing table passes it to the Checkout Session’s client_reference_id attribute to help you reconcile the Checkout Session with your internal system. This can be an authenticated user ID or a similar string. client-reference-id can be composed of alphanumeric characters, dashes, or underscores, and be any value up to 200 characters. Invalid values are silently dropped and your pricing table will continue to work as expected.
+
+Caution
+Since the pricing table is embedded on your website and is accessible to anyone, check that client-reference-id does not include sensitive information or secrets, such as passwords or API keys.
+
+pricing-page.html
+Select a language
+
+
+<body>
+  <h1>We offer plans that help any business!</h1>
+  <!-- Paste your embed code script here. -->
+  <script
+    async
+    src="https://js.stripe.com/v3/pricing-table.js">
+  </script>
+  <stripe-pricing-table
+    pricing-table-id='{{PRICING_TABLE_ID}}'
+    publishable-key="pk_test_51OocqGGEHfPiJwM4YLpvOAvWQBBpeFt4dsQG8wBfksxwmlKPCwUHfBJjAeYWqvhZhpoLs7JiwqjmBAM466DZjPKU00j0whzsnn"
+    client-reference-id="{{CLIENT_REFERENCE_ID}}"
+  >
+  </stripe-pricing-table>
+</body>
+Optional
+Add product marketing features
+Optional
+Add a custom call-to-action
+Optional
+Pass the customer email
+Optional
+Pass an existing customer
+Optional
+Customize the post-purchase experience
+Optional
+Update pricing table
+Optional
+Configure free trials
+Optional
+Content Security Policy
+Optional
+Let customers manage their subscriptions
+No code
+Optional
+Present local currencies
+Optional
+Add custom fields
+Limitations
+Business models—The pricing table supports common subscription business models like flat-rate, per-seat, tiered pricing, and trials. Other advanced pricing models aren’t supported.
+Product and price limits—You can configure the pricing table to display a maximum of four products, with up to three prices per product. You can only configure three unique pricing intervals across all products.
+Account creation—The pricing table call-to-action takes customers directly to checkout. It doesn’t currently support adding an intermediate step (for example, asking the customer to create an account on your website before checking out).
+Rate limit—The pricing table has a rate limit of up to 50 read operations per second. If you have multiple pricing tables, the rate limit is shared.
+Checkout redirect—The pricing table can’t redirect customers to checkout if your website provider sandboxes the embed code in an iframe without the allow-top-navigation attribute enabled. Contact your website provider to enable this setting.
+Testing the pricing table locally—The pricing table requires a website domain to render. To test the pricing table locally, run a local HTTP server to host your website’s index.html file over the localhost domain. To run a local HTTP server, use Python’s SimpleHTTPServer or the http-server npm module.
+Limit customers to one subscription
+You can redirect customers that already have a subscription to the customer portal or your website to manage their subscription. Learn more about limiting customers to one subscription.
+Setting subscription quantities
+Vary the cost of a subscription by subscribing a customer to multiple quantities of a product.
+Per-seat licensing
+Setting a quantity on a subscription is often described as “per-seat licensing”, which has a linear cost increase: 10 uses incurs a cost of 10 times the base price.
+
+By default, each subscription is for one product, but Stripe allows you to subscribe a customer to multiple quantities of an item. For example, say you run a hosting company and your customers host sites through it at a cost of 9.99 USD per site, per month. Most customers host a single site, while some host many. You could create prices for one site (9.99 USD), two sites (19.98 USD), and so forth, but a better approach is to subscribe customers to a quantity with a 9.99 USD unit price.
+
+Subscriptions have two kinds of usage-based billing: metered billing, and per-seat licensing. You can enable these billing models by setting the value of the recurring[usage_type] attribute when creating a price. You can only specify a quantity when creating a subscription with a recurring[usage_type] of licensed. If you want to have granular billing for usage that fluctuates within a billing interval, consider using metered billing instead of quantities.
+
+Setting multiple quantities
+To set the quantity on a subscription, provide a quantity value when creating or updating the subscription:
+
+Command Line
+Select a language
+
+
+
+curl https://api.stripe.com/v1/subscriptions \
+  -u "sk_test_51OocqGGEHfPiJwM4A8f5Rjlu1LjKj0P6hbWO8oYfGnBPofsJ3jBCtnAA5GA1EFz4noXoYKFls9BDRKfhjdh8H90d00t2TCmNsc:" \
+  -d customer=cus_4fdAW5ftNQow1a \
+  -d "items[0][price]"=price_CBb6IXqvTLXp3f \
+  -d "items[0][quantity]"=5
+You still bill multiple quantities using one invoice, and you prorate them when the subscription changes. This includes when you change subscription quantities.
+
+Charging different amounts based on quantity
+In some cases, you might want to adjust the cost per seat based on the number of seats in a subscription. For example, you could offer volume licensing discounts for subscriptions that exceed certain quantity thresholds. You can use tiers to adjust per-seat pricing.
+
+Quantity transformation
+When you bill your customers, you might want to track usage at a different granularity than you bill. For example, consider a productivity software suite that charges 10 USD for every 5 users (or portion thereof) using the product. Without quantity transformation, they would need to increase the quantity of the subscription item by 1 for every 5 users.
+
+Number of Users	Subscription Item Quantity Reported to Stripe	Total
+1	1	10 USD
+3	1	10 USD
+5	1	10 USD
+6	2	20 USD
+7	2	20 USD
+With the transform_quantity parameter, you can instruct Stripe to transform the quantity before applying the per unit cost. The following subscription allows you to naturally report the current number of users as the subscription item quantity—Stripe’s billing system divides the quantity by 5 and rounds up before calculating by the unit cost.
+
+Command Line
+Select a language
+
+
+
+curl https://api.stripe.com/v1/prices \
+  -u "sk_test_51OocqGGEHfPiJwM4A8f5Rjlu1LjKj0P6hbWO8oYfGnBPofsJ3jBCtnAA5GA1EFz4noXoYKFls9BDRKfhjdh8H90d00t2TCmNsc:" \
+  -d nickname="Standard Cost Per 5 Users" \
+  -d "transform_quantity[divide_by]"=5 \
+  -d "transform_quantity[round]"=up \
+  -d unit_amount=1000 \
+  -d currency=usd \
+  -d "recurring[interval]"=month \
+  -d "recurring[usage_type]"=licensed \
+  -d product={{PRODUCTIVITY_SUITE_ID}}
+Currently, the only available transformation is division, using the divide_by parameter in conjunction with the round parameter.
+
+You can only use transform_quantity with billing_scheme=per_unit—it’s incompatible with tiered pricing.
+
+Rounding
+The previous example showed a subscription that charges for every 5 users rounding up, that is, 6 divided by 5 results in a quantity of 2. For use cases where you don’t want to charge for a portion of usage, like charging for every full gigabyte of usage of a broadband internet service, you can also pass down as the value of round.
+
+Metered usage
+You can also apply transform_quantity in conjunction with metered billing. This transformation applies to prices with recurring[usage_type]=metered at the end of a billing period in the same way it applies to quantity for prices with recurring[usage_type]=licensed.
+
+A marketing email service that creates a metered price to charge 0.10 USD for every full 1000 emails sent might look something like this:
+
+Command Line
+Select a language
+
+
+
+curl https://api.stripe.com/v1/prices \
+  -u "sk_test_51OocqGGEHfPiJwM4A8f5Rjlu1LjKj0P6hbWO8oYfGnBPofsJ3jBCtnAA5GA1EFz4noXoYKFls9BDRKfhjdh8H90d00t2TCmNsc:" \
+  -d nickname="Metered Emails" \
+  -d "transform_quantity[divide_by]"=1000 \
+  -d "transform_quantity[round]"=down \
+  -d unit_amount=10 \
+  -d currency=usd \
+  -d "recurring[interval]"=month \
+  -d "recurring[usage_type]"=metered \
+  -d product={{MARKETING_EMAILS_ID}}
+With this subscription, usage can be reported per email and you can bill the customer 0.10 USD for every 1000 emails they send.
+Migrate subscriptions to Stripe Billing using Stripe APIs
+Learn how to migrate your existing subscriptions to Stripe using Stripe APIs.
+Learn how to migrate your existing subscriptions from a third-party, an in-house system, or an existing Stripe account to Stripe Billing using Stripe APIs.
+
+Before you begin
+If you haven’t already, review the migration stages.
+Set up a Stripe Billing integration. This prerequisite is only required once before importing subscriptions to Stripe, and you don’t need to repeat it for future migrations.
+Request a PAN data import from your current processor. If you’re attempting a Stripe-to-Stripe migration, this prerequisite isn’t necessary because you’re already using Stripe for payment processing.
+Manage legacy products and prices
+If you have legacy pricing models that you need to continue supporting in Stripe, create a placeholder product, such as Legacy plan. Here’s an example:
+
+Command Line
+Select a language
+
+
+
+curl https://api.stripe.com/v1/products \
+  -u "sk_test_51OocqGGEHfPiJwM4A8f5Rjlu1LjKj0P6hbWO8oYfGnBPofsJ3jBCtnAA5GA1EFz4noXoYKFls9BDRKfhjdh8H90d00t2TCmNsc:" \
+  -d id={{NEW_PRODUCT_ID}} \
+  -d name="Legacy plan" \
+  -d description="Imported legacy plan from source system" \
+  -d "metadata[OLD_PRODUCT_ID]"={{OLD_PRODUCT_ID}}
+When you need to update subscriptions with legacy plans, pass in the prices as needed using items.price_data. This overrides any existing legacy price. To learn more, see variable pricing.
+
+Command Line
+Select a language
+
+
+
+curl https://api.stripe.com/v1/subscriptions \
+  -u "sk_test_51OocqGGEHfPiJwM4A8f5Rjlu1LjKj0P6hbWO8oYfGnBPofsJ3jBCtnAA5GA1EFz4noXoYKFls9BDRKfhjdh8H90d00t2TCmNsc:" \
+  -d customer={{CUSTOMER_ID}} \
+  -d "items[0][price_data][currency]"=USD \
+  -d "items[0][price_data][product]"={{PRODUCT_ID}} \
+  -d "items[0][price_data][recurring][interval]"=month \
+  -d "items[0][price_data][recurring][interval_count]"=3 \
+  -d "items[0][price_data][unit_amount]"=1000 \
+  -d "items[0][quantity]"=1
+Import your subscriptions
+After you import your customers and create a pricing model, you can start importing your subscriptions. You should be able to export subscription data from third-party systems through their UI or API. Contact your subscriptions processor if they don’t provide this option through either interface.
+
+To import subscriptions, use your list of customers to create the appropriate subscription for each one. For example, if a subscriber has a monthly Basic subscription plan in your old model, use the monthly recurring price associated with that level when you create their subscription in Stripe.
+
+Make source data Stripe-compatible
+Before you start importing subscriptions into Stripe, make sure that all of your source data is compatible with our expected format.
+
+Important fields for migrating subscriptions
+If you use relevant subscription data in your custom integration that Stripe doesn’t also use, you can apply your data to the metadata field of the subscriptions you create in Stripe. The following table describes other important fields to consider when importing subscriptions.
+
+Field	Description
+customer	Make sure that you’ve properly mapped the customer ID from your source data to the new customer ID in Stripe.
+phases.items.price	Make sure that you’ve mapped the price ID from your source data to the new price ID in Stripe.
+current_phase.start_date	Make sure that the subscription schedule you define in Stripe lines up with and maintains continuity from your original source data. For example, if a customer has 6 months left on a yearly subscription in your source system, make sure that billing_cycle_anchor and start_date reflect the correct mid-cycle term.
+Third-party metadata	Import any additional data fields from your source data, which might include product names, plan names, and third-party application IDs.
+Tax settings	Include any tax IDs, VAT IDs, or other tax information.
+Prepare legacy prices
+If you created placeholders for legacy prices, you need to map those prices to the subscriptions and customers you’re importing. For each subscription with a legacy price, use the price_data parameter of the Subscriptions API to pass in information about the price and subscription. The required fields are:
+
+Parameter	Description
+currency	Currency of the price, in three-letter ISO format.
+product	ID of the placeholder product. You can use this for all of the legacy prices.
+recurring	Information about the amount and frequency of the recurring price.
+recurring.interval	Frequency of the interval-day, week, month, or year.
+recurring.interval_count	Number of intervals between billings. For example, setting interval=day and interval_count=30 means that you bill the customer every 30 days. The maximum interval is 1 year (1 year, 12 months, or 52 weeks).
+recurring.unit_amount_decimal	Same as unit_amount, but allows you to specify more granular decimal amounts in cents, up to 12 decimals. You can only set one of unit_amount and unit_amount_decimal.
+Import subscription data into Stripe
+After you’ve prepared your source data, you can start importing subscriptions into Stripe.
+
+Test mode
+Use test mode to run through the pricing model import process at least once before running the import in live mode. You need to remap your script:
+
+If you wipe the data in test mode and rerun the import.
+When you move to live mode, because the price IDs are different in test mode and live mode.
+In test mode, you can use test clocks to simulate subscriptions advancing through time. This allows you to see how the migrated subscriptions work in production.
+
+Create subscriptions
+While you can use the Subscription API to create subscriptions, we recommend using the Subscription Schedules API. With this API, you can schedule subscriptions to start in the future. For example, it’s the only way to start monthly subscriptions more than 30 days in advance. The ability to start subscriptions in the future also allows you to review the import before you start to bill your customers in production.
+
+Additionally, the Subscription Schedules API provides phases, which provide much more flexibility in defining settings such as tax behavior, collection method, and coupon usage within more granular intervals. You can also define different behavior for different intervals. For example, you could apply a coupon only for the first 3 months of a yearly subscription.
+
+Here’s how to create subscriptions that start on June 1, 2022 at 12:00 AM UTC.
+
+Command Line
+Select a language
+
+
+
+curl https://api.stripe.com/v1/subscription_schedules \
+  -u "sk_test_51OocqGGEHfPiJwM4A8f5Rjlu1LjKj0P6hbWO8oYfGnBPofsJ3jBCtnAA5GA1EFz4noXoYKFls9BDRKfhjdh8H90d00t2TCmNsc:" \
+  -d customer={{CUSTOMER_ID}} \
+  -d "default_settings[billing_cycle_anchor]"=phase_start \
+  -d "phases[0][items][0][price]"={{PRICE_ID}} \
+  -d start_date=1654066801
+Confirm your migration
+After you’ve imported your subscriptions, use the API to confirm that the subscriptions exist in Stripe.
+
+Use the list Subscriptions API to view all of the Subscriptions in Stripe. You can pass the created parameter to filter for recently created Subscriptions.
+
+Command Line
+Select a language
+
+
+
+curl -G https://api.stripe.com/v1/subscriptions \
+  -u "sk_test_51OocqGGEHfPiJwM4A8f5Rjlu1LjKj0P6hbWO8oYfGnBPofsJ3jBCtnAA5GA1EFz4noXoYKFls9BDRKfhjdh8H90d00t2TCmNsc:" \
+  -d "created[gt]"=1647294709
+
+Checkout Sessions API Documentation
+Checkout Sessions API Documentation This is the core API you're using with stripe.checkout.sessions.create() We need the exact parameters and response format?
+To use the Checkout Sessions API, you will need to create a session and then handle the response.
+
+To create a Checkout Session, you can use the /v1/checkout/sessions endpoint with various parameters, such as:
+
+customer_email: Prefills the email field in the checkout session.
+customer_update: Controls what fields on the Customer can be updated by the Checkout Session.
+discounts: Apply coupons or promotion codes.
+tax_id_collection: Controls tax ID collection during checkout.
+ui_mode: Defines whether the session will be displayed as an embedded form or on a hosted page.
+A sample request to create a session might look like this:
+
+
+
+curl https://api.stripe.com/v1/checkout/sessions \
+  -u sk_test_4eC39HqLyjWDarjtT1zdp7dc: \
+  -d success_url="https://example.com/success" \
+  -d cancel_url="https://example.com/cancel" \
+  -d payment_method_types[]=card \
+  -d line_items[][price]="{{PRICE_ID}}" \
+  -d line_items[][quantity]=1 \
+  -d mode=payment
+The response will include a session object with various fields, such as:
+
+id: Unique identifier for the session.
+url: The URL to the active Checkout Session.
+amount_total: Total amount after discounts and taxes.
+amount_subtotal: Total amount before discounts and taxes.
+payment_status: Status of the payment.
+Webhook Documentation
+Webhook Documentation How to properly set up and handle webhook events Especially for subscription lifecycle events
+To properly set up and handle webhook events, especially for subscription lifecycle events, start by creating a webhook endpoint in your application. This endpoint will receive HTTP POST requests from Stripe containing event notifications. Ensure your endpoint can handle and store these events securely.
+
+For subscription lifecycle, configure your webhook to listen specifically for relevant events such as customer.subscription.created, customer.subscription.updated, customer.subscription.deleted, invoice.paid, and invoice.payment_failed. This targeted listening helps in managing access to services or features that your customers have subscribed to and addressing issues like payment failures effectively.
+
+It's important to verify the signature of incoming webhook events to secure against unauthorized requests. Stripe provides a secret key to verify the event signature.
+
+Best practices include handling events asynchronously to avoid blocking your application processes and implementing logic to handle potential duplicate events by using unique event identifiers.
+
+Testing your webhook setup with the Stripe CLI can simulate events and help ensure proper processing in your development environment before going live.
+Test Mode Documentation
+Test Mode Documentation To help debug the current issues Including test card numbers and webhook testing
+To debug issues in test mode, you can leverage several tools and features provided by Stripe. Test mode allows you to simulate different scenarios without processing actual payments. You can use test card numbers provided by Stripe to simulate various payment outcomes, such as successful payments, failed payments, and testing authentication methods like 3D Secure. For simulating purchases with specific card product codes, you can use specific test cards that correspond to different Mastercard products.
+
+Additionally, you can use webhook endpoints to test your integration. Stripe's test mode supports configuring webhooks, which you can set up to receive simulated event notifications like payment confirmations or disputes. This setup helps ensure that your system can handle real-world scenarios once you switch to live mode.
+
+It's crucial to understand that test mode API keys are different from live mode ones, and you should ensure that your test mode keys are used in your integration's testing environment. You can find your test mode API keys in the Stripe Dashboard under the API keys section.
+stripe.com/docs/api/checkout/sessions/create
+To create a Checkout Session in Stripe, you'll need to set up a server-side endpoint that uses the Stripe API. Here’s a basic guide on how to achieve this:
+
+Create the Endpoint: Implement a server-side script that calls the Stripe API to create a Checkout Session. This session will define the items to be purchased, the amount, currency, and payment options.
+
+Setup Parameters: Use the SessionCreateParams to specify details such as payment_method_types (e.g., 'card'), line_items that define the product and quantity, and the mode of payment, which could be payment for one-time, subscription for recurring, or setup for future payments.
+
+Success and Cancel URLs: Provide the success_url and cancel_url in the session creation parameters. Stripe will redirect customers to these URLs after successful payment or if they cancel the process.
+
+Redirect Customers: Once the Checkout Session is successfully created, extract the URL provided in the session response and redirect your customers to this URL to complete the payment process.
+Create a Session 
+Creates a Session object.
+
+Parameters
+
+automatic_tax
+object
+Settings for automatic tax lookup for this session and resulting payments, invoices, and subscriptions.
+
+Show child parameters
+
+client_reference_id
+string
+A unique string to reference the Checkout Session. This can be a customer ID, a cart ID, or similar, and can be used to reconcile the session with your internal systems.
+
+
+customer
+string
+ID of an existing Customer, if one exists. In payment mode, the customer’s most recently saved card payment method will be used to prefill the email, name, card details, and billing address on the Checkout page. In subscription mode, the customer’s default payment method will be used if it’s a card, otherwise the most recently saved card will be used. A valid billing address, billing name and billing email are required on the payment method for Checkout to prefill the customer’s card details.
+
+If the Customer already has a valid email set, the email will be prefilled and not editable in Checkout. If the Customer does not have a valid email, Checkout will set the email entered during the session on the Customer.
+
+If blank for Checkout Sessions in subscription mode or with customer_creation set as always in payment mode, Checkout will create a new Customer object based on information provided during the payment flow.
+
+You can set payment_intent_data.setup_future_usage to have Checkout automatically attach the payment method to the Customer you pass in for future reuse.
+
+
+customer_email
+string
+If provided, this value will be used when the Customer object is created. If not provided, customers will be asked to enter their email address. Use this parameter to prefill customer data if you already have an email on file. To access information about the customer once a session is complete, use the customer field.
+
+
+line_items
+array of objects
+Required unless setup mode
+A list of items the customer is purchasing. Use this parameter to pass one-time or recurring Prices.
+
+For payment mode, there is a maximum of 100 line items, however it is recommended to consolidate line items if there are more than a few dozen.
+
+For subscription mode, there is a maximum of 20 line items with recurring Prices and 20 line items with one-time Prices. Line items with one-time Prices will be on the initial invoice only.
+
+Show child parameters
+
+metadata
+object
+Set of key-value pairs that you can attach to an object. This can be useful for storing additional information about the object in a structured format. Individual keys can be unset by posting an empty value to them. All keys can be unset by posting an empty value to metadata.
+
+
+mode
+enum
+Required
+The mode of the Checkout Session. Pass subscription if the Checkout Session includes at least one recurring item.
+
+Possible enum values
+payment
+Accept one-time payments for cards, iDEAL, and more.
+
+setup
+Save payment details to charge your customers later.
+
+subscription
+Use Stripe Billing to set up fixed-price subscriptions.
+
+
+return_url
+string
+Required conditionally
+The URL to redirect your customer back to after they authenticate or cancel their payment on the payment method’s app or site. This parameter is required if ui_mode is embedded and redirect-based payment methods are enabled on the session.
+
+
+success_url
+string
+Required conditionally
+The URL to which Stripe should send customers when payment or setup is complete. This parameter is not allowed if ui_mode is embedded. If you’d like to use information from the successful Checkout Session on your page, read the guide on customizing your success page.
